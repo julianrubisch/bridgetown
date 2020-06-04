@@ -18,12 +18,15 @@ Bridgetown is a Webpack-aware, Ruby-powered static site generator for the modern
 
 ---
 
-## Stability Notice…
+## Special Thanks to Our Founding Members! 🙏 🎉
 
-Given Bridgetown's strong inherited bones (see background below) and our continued
-emphasis on good testing, we're pretty confident Bridgetown is ready to use today.
-But…you might want to exercise a bit of extra caution using this in production. 🙂
-We are already (after all, the Bridgetown website is built with Bridgetown), but YMMV.
+Say howdy 👋 to our growing list of the first twenty sponsors of Bridgetown on GitHub.
+[You too can join this list and sponsor Bridgetown!](https://github.com/sponsors/jaredcwhite)
+
+|<img src="https://avatars.githubusercontent.com/pilotcph?s=256" alt="pilotcph" width="128" />|<img src="https://avatars.githubusercontent.com/andrewmcodes?s=256" alt="andrewmcodes" width="128" />|<img src="https://avatars.githubusercontent.com/miatrinity?s=256" alt="miatrinity" width="128" />|
+|:---:|:---:|:---:|
+|<a href="https://twitter.com/cabgfx">@cabgfx</a>|<a href="https://twitter.com/andrewmcodes">@andrewmcodes</a>|<a href="https://github.com/miatrinity">@miatrinity</a>|You Next?|
+|<a href="http://www.pilotcph.dk">Website</a>|<a href="https://andrewm.codes">Website</a>|<a href="https://railsnew.io/">Website</a>|Anywhere|
 
 ---
 
@@ -89,8 +92,7 @@ If you don't find the answer to your problem in our [docs](https://bridgetownrb.
 ## Code of Conduct
 
 In order to have a more open and welcoming community, Bridgetown adheres to a
-[code of conduct](CODE_OF_CONDUCT.markdown) adapted from the Ruby on Rails code of
-conduct.
+[code of conduct](CODE_OF_CONDUCT.md) adapted from the Contributor Covenant.
 
 Please adhere to this code of conduct in any interactions you have in the
 Bridgetown community. It is strictly enforced on all official Bridgetown

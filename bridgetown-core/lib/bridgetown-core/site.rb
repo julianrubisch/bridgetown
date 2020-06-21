@@ -20,6 +20,13 @@ module Bridgetown
                   :keep_files, :baseurl, :data, :file_read_opts,
                   :plugin_manager, :converters, :generators, :reader
 
+    # Class convenience method to load a site with default options and read content
+    def self.setup_and_read
+      site = new(Bridgetown.configuration)
+      site.read
+      site
+    end
+
     # Public: Initialize a new Site.
     #
     # config - A Hash containing site configuration details.

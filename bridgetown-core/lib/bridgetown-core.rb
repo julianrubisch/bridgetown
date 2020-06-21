@@ -44,10 +44,21 @@ require "faraday"
 require "thor"
 
 SafeYAML::OPTIONS[:suppress_warnings] = true
+SafeYAML::OPTIONS[:whitelisted_tags] = ["!ruby/string:Rb"]
 
 # Create our little String subclass for Ruby Front Matter
 class Rb < String; end
-SafeYAML::OPTIONS[:whitelisted_tags] = ["!ruby/string:Rb"]
+
+# Monkey-patch YAML serialization so it's always Literal (|) scalar style
+Psych::TreeBuilder.class_eval do
+  def scalar(value, anchor, tag, plain, quoted, style)
+    style = Psych::Nodes::Scalar::LITERAL if tag == "!ruby/string:Rb"
+    s = Psych::Nodes::Scalar.new(value, anchor, tag, plain, quoted, style)
+    set_location(s)
+    @last.children << s
+    s
+  end
+end
 
 module Bridgetown
   # internal requires

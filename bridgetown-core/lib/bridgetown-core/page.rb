@@ -54,6 +54,14 @@ module Bridgetown
     end
     # rubocop:enable Metrics/ParameterLists
 
+    def process_absolute_path(path)
+      path = Pathname.new(path)
+      @dir = path.dirname.relative_path_from(site.source).to_s
+      @name = path.basename.to_s
+      @relative_path = nil
+      process(@name)
+    end
+
     # The generated directory into which the page will be placed
     # upon generation. This is derived from the permalink or, if
     # permalink is absent, will be '/'

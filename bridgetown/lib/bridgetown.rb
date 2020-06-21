@@ -5,4 +5,5 @@ require "bridgetown-core/version"
 
 # Load additional monorepo gems
 require "bridgetown-builder"
+require "bridgetown-model"
 require "bridgetown-paginate"

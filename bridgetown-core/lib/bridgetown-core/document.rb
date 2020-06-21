@@ -37,25 +37,28 @@ module Bridgetown
     # Create a new Document.
     #
     # path - the path to the file
-    # relations - a hash with keys :site and :collection, the values of which
-    #             are the Bridgetown::Site and Bridgetown::Collection to which this
-    #             Document belong.
+    # collection - the Bridgetown::Collection to which this Document belongs
+    # site - the Bridgetown::Site to which this Document belongs (optional)
     #
     # Returns nothing.
-    def initialize(path, relations = {})
-      @site = relations[:site]
-      @path = path
-      @extname = File.extname(path)
-      @collection = relations[:collection]
+    def initialize(path, collection:, site: nil)
+      @site = site || collection.site
+      process_absolute_path(path || "")
+      @collection = collection
       @type = @collection.label.to_sym
 
       @has_yaml_header = nil
 
       data.default_proc = proc do |_, key|
-        site.frontmatter_defaults.find(relative_path, type, key)
+        @site.frontmatter_defaults.find(relative_path, type, key)
       end
 
       trigger_hooks(:post_init)
+    end
+
+    def process_absolute_path(path)
+      @path = path
+      @extname = File.extname(@path)
     end
 
     # Fetch the Document's data.

@@ -43,4 +43,5 @@ end
 # Bridgetown
 gem 'bridgetown-core', path: 'bridgetown-core'
 gem 'bridgetown-builder', path: 'bridgetown-builder'
+gem 'bridgetown-model', path: 'bridgetown-model'
 gem 'bridgetown-paginate', path: 'bridgetown-paginate'

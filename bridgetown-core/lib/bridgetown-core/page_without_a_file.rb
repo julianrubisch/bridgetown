@@ -8,7 +8,7 @@ module Bridgetown
   # attributes "dir", "name", "path", "url" defined on it.
   class PageWithoutAFile < Page
     def read_yaml(*)
-      @data ||= {}
+      @data ||= ActiveSupport::HashWithIndifferentAccess.new
     end
   end
 end

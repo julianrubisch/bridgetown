@@ -190,7 +190,7 @@ module Bridgetown
       attributes.include?(method_name) || method_name.to_s.end_with?("=") || super
     end
 
-    def method_missing(method_name, *args, &block)
+    def method_missing(method_name, *args)
       return attributes[method_name] if attributes.include?(method_name)
 
       key = method_name.to_s
@@ -200,7 +200,9 @@ module Bridgetown
         return attributes[key]
       end
 
-      super
+      Bridgetown.logger.warn "key `#{method_name}' not found in attributes for" \
+                             " #{wrapped_document.relative_path}"
+      nil
     end
 
     def fetch(key, default = nil)

@@ -6,12 +6,14 @@ desc "Test all Bridgetown gems in monorepo"
 task :test_all do
   sh "cd bridgetown-core && script/cibuild"
   sh "cd bridgetown-builder && script/cibuild"
+  sh "cd bridgetown-model && script/cibuild"
   sh "cd bridgetown-paginate && script/cibuild"
 end
 
 task :release_all_unsafe do
   sh "cd bridgetown-core && bundle exec rake release"
   sh "cd bridgetown-builder && bundle exec rake release"
+  sh "cd bridgetown-model && bundle exec rake release"
   sh "cd bridgetown-paginate && bundle exec rake release"
   sh "cd bridgetown && bundle exec rake release"
 end

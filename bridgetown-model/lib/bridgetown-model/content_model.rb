@@ -184,10 +184,8 @@ module Bridgetown
       @_changeset.will_change!(key)
     end
 
-    def respond_to?(method_name)
-      return true if attributes.include?(method_name) || method_name.to_s.end_with?("=")
-
-      super
+    def respond_to_missing?(method_name, include_private = false)
+      attributes.include?(method_name) || method_name.to_s.end_with?("=") || super
     end
 
     def method_missing(method_name, *args, &block)

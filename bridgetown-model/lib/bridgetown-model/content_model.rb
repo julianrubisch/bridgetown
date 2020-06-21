@@ -2,34 +2,16 @@
 
 require "base64"
 require "active_model"
+require "active_support/core_ext/date_time"
 
 module Bridgetown
-  class AttributeChangeset
-    def initialize(model)
-      @model = model
-      @changeset = Set.new
-    end
-
-    def will_change!(attr)
-      @changeset << attr
-    end
-
-    def changes
-      @changeset
-    end
-
-    def clear!
-      @changeset.clear
-    end
-  end
-
   class ContentModel
     include ActiveModel::Model
     extend ActiveModel::Callbacks
     define_model_callbacks :save, :destroy
 
     def self.new_with_document(document)
-      new.tap do |model|
+      ContentStrategy.klass_for_document(document).new.tap do |model|
         model.wrap_document(document)
       end
     end
@@ -86,6 +68,20 @@ module Bridgetown
 
     def absolute_path_in_source_dir
       wrapped_document.site.in_source_dir(wrapped_document.path)
+    end
+
+    def posted_datetime
+      if attributes.include?(:date) && date
+        date.to_datetime
+      elsif matched = File.basename(wrapped_document.path.to_s).match(%r!^[0-9]+-[0-9]+-[0-9]+!)
+        matched[0].to_datetime
+      elsif persisted?
+        File.stat(absolute_path_in_source_dir).mtime
+      end
+    end
+
+    def url
+      wrapped_document.url
     end
 
     def content
@@ -149,7 +145,11 @@ module Bridgetown
     end
 
     def file_output_to_write
-      processed_front_matter.to_yaml + "---" + "\n\n" + content.to_s
+      if wrapped_document.yaml_file?
+        processed_front_matter.to_yaml
+      else
+        processed_front_matter.to_yaml + "---" + "\n\n" + content.to_s
+      end
     end
 
     def processed_front_matter
@@ -158,7 +158,9 @@ module Bridgetown
           absolute_path_in_source_dir,
           Utils.merged_file_read_opts(wrapped_document.site, {})
         )
-        if file_match = file_contents.match(Document::YAML_FRONT_MATTER_REGEXP)
+        if wrapped_document.yaml_file?
+          yaml_data = SafeYAML.load(file_contents)
+        elsif file_match = file_contents.match(Document::YAML_FRONT_MATTER_REGEXP)
           yaml_data = SafeYAML.load(file_match.captures[0])
         else
           raise Errors::FatalException,
@@ -200,5 +202,11 @@ module Bridgetown
 
       super
     end
+
+    def fetch(key, default = nil)
+      respond_to?(key) ? send(key) : default
+    end
   end
 end
+
+require "bridgetown-model/content_model_classes"

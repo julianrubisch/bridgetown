@@ -227,6 +227,7 @@ module Bridgetown
 
       if yaml_file?
         @data = SafeYAML.load_file(path)
+        @data = @data.with_indifferent_access if @data.is_a?(Hash)
       else
         begin
           merge_defaults

@@ -59,6 +59,7 @@ module Bridgetown
     def process_absolute_path(path)
       @path = path
       @extname = File.extname(@path)
+      @relative_path = nil
     end
 
     # Fetch the Document's data.

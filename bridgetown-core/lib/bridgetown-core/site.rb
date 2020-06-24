@@ -21,8 +21,8 @@ module Bridgetown
                   :plugin_manager, :converters, :generators, :reader
 
     # Class convenience method to load a site with default options and read content
-    def self.setup_and_read
-      site = new(Bridgetown.configuration)
+    def self.setup_and_read(overrides = {})
+      site = new(Bridgetown.configuration(overrides))
       site.read
       site
     end

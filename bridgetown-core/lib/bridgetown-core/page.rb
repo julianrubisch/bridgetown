@@ -55,9 +55,14 @@ module Bridgetown
     # rubocop:enable Metrics/ParameterLists
 
     def process_absolute_path(path)
-      path = Pathname.new(path)
-      @dir = path.dirname.relative_path_from(site.source).to_s
-      @name = path.basename.to_s
+      if path.present?
+        path = Pathname.new(path)
+        @dir = path.dirname.relative_path_from(site.source).to_s
+        @name = path.basename.to_s
+      else
+        @dir = ""
+        @name = ""
+      end
       @relative_path = nil
       process(@name)
     end

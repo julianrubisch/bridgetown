@@ -10,10 +10,14 @@ module Bridgetown
 
     def self.klass_for_document(document)
       if document.respond_to?(:collection)
-        @strategies.fetch(document.collection.label, ContentModel)
+        klass_for_label document.collection.label
       else
-        @strategies.fetch(:pages, ContentModel)
+        klass_for_label :pages
       end
+    end
+
+    def self.klass_for_label(label)
+      @strategies.fetch label, ContentModel
     end
   end
 end

@@ -24,6 +24,27 @@ module Bridgetown
       new_with_document(Bridgetown::PageWithoutAFile.new(site, site.source, "", ""))
     end
 
+    def self.new_via_label(label, site:)
+      label = label.to_s
+      group = if label == "page"
+                "pages"
+              elsif label == "pages"
+                label
+              elsif site.collections[label]
+                label
+              elsif site.collections[label.pluralize]
+                label.pluralize
+              else
+                raise Errors::FatalException,
+                      "Collection could not be found for `#{label}'"
+              end
+      if group == "pages"
+        new_in_pages site
+      else
+        new_in_collection site.collections[group]
+      end
+    end
+
     def self.find_in_collection(id, collection)
       find_in_group(id, collection.docs)
     end
@@ -36,6 +57,53 @@ module Bridgetown
       id = Base64.urlsafe_decode64(id) unless id.include?(".")
       document = group.find { |doc| doc.relative_path == id }
       new_with_document(document) if document
+    end
+
+    def self.group_for_label(label, site:)
+      label = label.to_s
+      group = if label == "page"
+                "pages"
+              elsif label == "pages"
+                label
+              elsif site.collections[label]
+                label
+              elsif site.collections[label.pluralize]
+                label.pluralize
+              else
+                raise Errors::FatalException,
+                      "Collection could not be found for `#{label}'"
+              end
+      if group == "pages"
+        site.pages
+      else
+        site.collections[group].docs
+      end
+    end
+
+    def self.models_for_label(label, site:)
+      group_for_label(label, site: site).map(&:to_model).select(&:persisted?)
+    end
+
+    def self.find(id, label:, site:)
+      find_in_group id, group_for_label(label, site: site)
+    end
+
+    def self.find_all(label, site:, order_by: :posted_datetime, order_direction: :desc)
+      models = models_for_label(label, site: site)
+
+      if order_by.to_s == "use_configured"
+        models
+      else
+        begin
+          models.sort_by! do |content_model|
+            content_model.send(order_by)
+          end
+        rescue ArgumentError => e
+          Bridgetown.logger.warn "Sorting #{label} by #{order_by}, value comparison failed"
+          models.sort_by!(&:posted_datetime)
+        end
+        order_direction.to_s == "desc" ? models.reverse : models
+      end
     end
 
     def initialize(attributes = {})
@@ -77,6 +145,8 @@ module Bridgetown
         matched[0].to_datetime
       elsif persisted?
         File.stat(absolute_path_in_source_dir).mtime
+      else
+        wrapped_document.site.time
       end
     end
 
@@ -95,7 +165,7 @@ module Bridgetown
     def generate_new_slug
       prefix = if wrapped_document.respond_to?(:collection) &&
           wrapped_document.collection.label == "posts"
-                 wrapped_document.date.strftime("%Y-%m-%d-")
+                 wrapped_document.date.to_datetime.strftime("%Y-%m-%d-")
                else
                  ""
                end
@@ -174,7 +244,18 @@ module Bridgetown
         end
         yaml_data
       else
-        attributes.deep_stringify_keys
+        attributes.to_h.deep_stringify_keys
+      end
+    end
+
+    def destroy
+      run_callbacks :destroy do
+        if persisted?
+          File.delete(absolute_path_in_source_dir)
+          wrapped_document.process_absolute_path("")
+
+          true
+        end
       end
     end
 

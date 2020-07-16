@@ -40,6 +40,11 @@ a,
   transition-property: background, background-color, color;
 }
 
+body.post .button.is-small {
+  height: auto;
+  white-space: normal;
+}
+
 @keyframes fade-in-button {
   from {
     opacity: 0;

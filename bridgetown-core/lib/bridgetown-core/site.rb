@@ -10,11 +10,19 @@ module Bridgetown
     include Localizable
     include Processable
     include Renderable
+    include SSR
     include Writable
 
-    attr_reader   :root_dir, :source, :dest, :cache_dir, :config,
-                  :regenerator, :liquid_renderer, :components_load_paths,
-                  :includes_load_paths
+    # @return [Bridgetown::Configuration]
+    attr_reader :config
+
+    # @return [Symbol]
+    attr_reader :label
+
+    # @return [Bridgetown::Utils::LoadersManager]
+    attr_reader :loaders_manager
+
+    attr_reader :cache_dir, :liquid_renderer
 
     # All files not pages/documents or structured data in the source folder
     # @return [Array<StaticFile>]
@@ -23,30 +31,39 @@ module Bridgetown
     # @return [Array<Layout>]
     attr_accessor :layouts
 
-    # @return [Array<Page>]
-    attr_accessor :pages
+    # @return [Array<GeneratedPage>]
+    attr_accessor :generated_pages
 
-    attr_accessor :exclude, :include, :lsi, :highlighter, :permalink_style,
-                  :time, :future, :unpublished, :limit_posts,
-                  :keep_files, :baseurl, :data, :file_read_opts,
-                  :plugin_manager, :converters, :generators, :reader
+    attr_accessor :permalink_style, :time, :data,
+                  :file_read_opts, :plugin_manager, :converters,
+                  :generators, :reader
 
-    # Public: Initialize a new Site.
+    # Initialize a new Site.
     #
-    # config - A Hash containing site configuration details.
-    def initialize(config)
+    # @param config [Bridgetown::Configuration]
+    # @param loaders_manager [Bridgetown::Utils::LoadersManager] initialized if none provided
+    def initialize(config, label: :main, loaders_manager: nil)
+      @label = label.to_sym
       self.config = config
       locale
+
+      loaders_manager = if loaders_manager
+                          loaders_manager.config = self.config
+                          loaders_manager
+                        else
+                          Bridgetown::Utils::LoadersManager.new(self.config)
+                        end
+      @loaders_manager = loaders_manager
 
       @plugin_manager  = PluginManager.new(self)
       @cleaner         = Cleaner.new(self)
       @reader          = Reader.new(self)
-      @regenerator     = Regenerator.new(self)
       @liquid_renderer = LiquidRenderer.new(self)
 
+      Bridgetown::Cache.base_cache["site_tmp"] = {}.with_dot_access
       ensure_not_in_dest
 
-      Bridgetown.sites << self
+      Bridgetown::Current.sites[@label] = self
       Bridgetown::Hooks.trigger :site, :after_init, self
 
       reset   # Processable
@@ -63,6 +80,14 @@ module Bridgetown
                 "Destination directory cannot be or contain the Source directory."
         end
       end
+    end
+
+    def tmp_cache
+      Bridgetown::Cache.base_cache["site_tmp"]
+    end
+
+    def inspect
+      "#<Bridgetown::Site #{metadata.inspect.delete_prefix("{").delete_suffix("}")}>"
     end
   end
 end

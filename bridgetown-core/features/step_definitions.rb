@@ -26,7 +26,7 @@ end
 #
 
 Given(%r!^I have a blank site in "(.*)"$!) do |path|
-  FileUtils.mkdir_p(path) unless File.exist?(path)
+  FileUtils.mkdir_p(path)
 end
 
 #
@@ -47,7 +47,7 @@ Given(%r!^I have an? "(.*)" page(?: with (.*) "(.*)")? that contains "(.*)"$!) d
       #{text}
     DATA
   else
-    FileUtils.mkdir_p("src") unless File.exist?("src")
+    FileUtils.mkdir_p("src")
     File.write(File.join("src", file), <<~DATA)
       ---
       #{key || "layout"}: #{value || "none"}
@@ -64,7 +64,7 @@ Given(%r!^I have an? "(.*)" file that contains "(.*)"$!) do |file, text|
   if Paths.root_files.include?(file.split("/").first)
     File.write(file, text)
   else
-    FileUtils.mkdir_p("src") unless File.exist?("src")
+    FileUtils.mkdir_p("src")
     File.write(File.join("src", file), text)
   end
 end
@@ -85,7 +85,7 @@ Given(%r!^I have an? "(.*)" file with content:$!) do |file, text|
   if Paths.root_files.include?(file.split("/").first)
     File.write(file, text)
   else
-    FileUtils.mkdir_p("src") unless File.exist?("src")
+    FileUtils.mkdir_p("src")
     File.write(File.join("src", file), text)
   end
 end
@@ -93,7 +93,7 @@ end
 #
 
 Given(%r!^I have an? "(.*)" page(?: configured with (.*) "(.*)")? with content:$!) do |file, key, value, text|
-  FileUtils.mkdir_p("src") unless File.exist?("src")
+  FileUtils.mkdir_p("src")
   File.write(File.join("src", file), <<~DATA)
     ---
     #{key || "layout"}: #{value || "none"}
@@ -105,7 +105,7 @@ end
 
 #
 
-Given(%r!^I have an? \"?(.*?)\"? directory$!) do |dir|
+Given(%r!^I have an? "?(.*?)"? directory$!) do |dir|
   if Paths.root_files.include?(dir)
     FileUtils.mkdir_p(dir)
   else
@@ -120,7 +120,7 @@ Given(%r!^I have the following (page|post)s?(?: (in|under) "([^"]+)")?:$!) do |s
   table.hashes.each do |input_hash|
     title = slug(input_hash["title"])
     ext = input_hash["type"] || "markdown"
-    filename = "#{title}.#{ext}" if %w(page).include?(status)
+    filename = "#{title}.#{ext}" if status == "page"
     before, after = location(folder, direction)
     dest_folder = "_posts" if status == "post"
     dest_folder = "" if status == "page"
@@ -186,13 +186,13 @@ end
 #
 
 Given(%r!^I have a configuration file with "(.*)" set to "(.*)"$!) do |key, value|
-  config = \
+  config =
     if source_dir.join("bridgetown.config.yml").exist?
-      SafeYAML.load_file(source_dir.join("bridgetown.config.yml"))
+      Bridgetown::YAMLParser.load_file(source_dir.join("bridgetown.config.yml"))
     else
       {}
     end
-  config[key] = YAML.load(value)
+  config[key] = Bridgetown::YAMLParser.load(value)
   Bridgetown.set_timezone(value) if key == "timezone"
   File.write("bridgetown.config.yml", YAML.dump(config))
 end
@@ -207,7 +207,7 @@ end
 
 #
 
-Given(%r!^I have a configuration file with "([^\"]*)" set to:$!) do |key, table|
+Given(%r!^I have a configuration file with "([^"]*)" set to:$!) do |key, table|
   File.open("bridgetown.config.yml", "w") do |f|
     f.write("#{key}:\n")
     table.hashes.each do |row|
@@ -318,58 +318,6 @@ end
 
 #
 
-Then(%r!^I should (not )?see "(.*)" in "(.*)" if on Windows$!) do |negative, text, file|
-  step %(the "#{file}" file should exist)
-  regexp = Regexp.new(text, Regexp::MULTILINE)
-  if negative.nil? || negative.empty?
-    if Bridgetown::Utils::Platforms.really_windows?
-      expect(file_contents(file)).to match regexp
-    else
-      expect(file_contents(file)).not_to match regexp
-    end
-  end
-end
-
-#
-
-Then(%r!^I should (not )?see "(.*)" in "(.*)" unless Windows$!) do |negative, text, file|
-  step %(the "#{file}" file should exist)
-  regexp = Regexp.new(text, Regexp::MULTILINE)
-  if negative.nil? || negative.empty?
-    if Bridgetown::Utils::Platforms.really_windows?
-      expect(file_contents(file)).not_to match regexp
-    else
-      expect(file_contents(file)).to match regexp
-    end
-  end
-end
-
-#
-
-Then(%r!^I should see date "(.*)" in "(.*)" unless Windows$!) do |text, file|
-  step %(the "#{file}" file should exist)
-  regexp = Regexp.new(text)
-  if Bridgetown::Utils::Platforms.really_windows? && !dst_active?
-    expect(file_contents(file)).not_to match regexp
-  else
-    expect(file_contents(file)).to match regexp
-  end
-end
-
-#
-
-Then(%r!^I should see date "(.*)" in "(.*)" if on Windows$!) do |text, file|
-  step %(the "#{file}" file should exist)
-  regexp = Regexp.new(text)
-  if Bridgetown::Utils::Platforms.really_windows? && !dst_active?
-    expect(file_contents(file)).to match regexp
-  else
-    expect(file_contents(file)).not_to match regexp
-  end
-end
-
-#
-
 Then(%r!^I should see exactly "(.*)" in "(.*)"$!) do |text, file|
   step %(the "#{file}" file should exist)
   expect(file_contents(file).strip).to eq text
@@ -415,12 +363,12 @@ end
 
 #
 
-Then(%r!^I should get a zero exit(?:\-| )status$!) do
+Then(%r!^I should get a zero exit(?:-| )status$!) do
   step %(I should see "EXIT STATUS: 0" in the build output)
 end
 
 #
 
-Then(%r!^I should get a non-zero exit(?:\-| )status$!) do
+Then(%r!^I should get a non-zero exit(?:-| )status$!) do
   step %(I should not see "EXIT STATUS: 0" in the build output)
 end

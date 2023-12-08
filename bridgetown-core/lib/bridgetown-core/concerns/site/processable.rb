@@ -21,8 +21,10 @@ class Bridgetown::Site
     end
 
     # Reset all in-memory data and content.
+    #
+    # @param soft [Boolean] if true, persist some state and do a light refresh of layouts and data
     # @return [void]
-    def reset
+    def reset(soft: false) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       self.time = Time.now
       if config["time"]
         self.time = Bridgetown::Utils.parse_date(
@@ -30,21 +32,37 @@ class Bridgetown::Site
         )
       end
       self.layouts = HashWithDotAccess::Hash.new
-      self.pages = []
+      self.generated_pages = []
       self.static_files = []
-      self.data = HashWithDotAccess::Hash.new
-      @post_attr_hash = {}
+      self.data = HashWithDotAccess::Hash.new unless soft
+      @frontend_manifest = nil
       @collections = nil
       @documents = nil
       @docs_to_write = nil
-      @regenerator.clear_cache
       @liquid_renderer.reset
-      frontmatter_defaults.reset
+      tmp_cache.clear
 
-      raise ArgumentError, "limit_posts must be a non-negative number" if limit_posts.negative?
+      if soft
+        refresh_layouts_and_data
+      else
+        frontmatter_defaults.reset
+        Bridgetown::Cache.clear_if_config_changed config
+      end
 
-      Bridgetown::Cache.clear_if_config_changed config
-      Bridgetown::Hooks.trigger :site, :after_reset, self
+      Bridgetown::Hooks.trigger :site, (soft ? :after_soft_reset : :after_reset), self
+    end
+
+    # Read layouts and merge any new data collection contents into the site data
+    def refresh_layouts_and_data
+      reader.read_layouts
+
+      collections.data.tap do |coll|
+        coll.resources.clear
+        coll.read
+        coll.merge_data_resources.each do |k, v|
+          data[k] = v # refresh site data
+        end
+      end
     end
 
     # Read data from disk and load it into internal memory.
@@ -52,19 +70,10 @@ class Bridgetown::Site
     def read
       Bridgetown::Hooks.trigger :site, :pre_read, self
       reader.read
-      limit_posts!
       Bridgetown::Hooks.trigger :site, :post_read, self
     end
 
     private
-
-    # Limits the current posts; removes the posts which exceed the limit_posts
-    def limit_posts!
-      if limit_posts.positive?
-        limit = posts.docs.length < limit_posts ? posts.docs.length : limit_posts
-        posts.docs = posts.docs[-limit, limit]
-      end
-    end
 
     def print_stats
       Bridgetown.logger.info @liquid_renderer.stats_table

@@ -4,7 +4,7 @@ title: I'm an ERB Page
 page_var: 123
 ---
 
-One two three: <%= page[:page_var] * 10 %>
+One two three: <%= page.data[:page_var] * 10 %>
 
 <%= liquid_render "test_component", param: "Liquid FTW!" %>
 
@@ -27,6 +27,19 @@ Oats, <%= array_to_sentence_string ["peas", "beans", "barley"] %> grow.
 
 <%= render RubyComponent.new %>
 
+<%= render(Card.new(title: "I'm a card", footer: "I'm a footer")) do |c| %>
+  <% c.slot :image do %>
+    <img src="test.jpg" />
+  <% end %>
+  <p>I'm the body of the <%= c.kind %></p>
+<% end %>
+
+<%= render(Card.new(title: "Nope", footer: "CANCEL!")) do %>
+  Canceled!
+<% end %>
+
+<%= render (Nested.new(level: 1)) do %>Level 1<% end %>
+
 <%= render Example::OverrideComponent.new %>
 
 ===
@@ -34,3 +47,7 @@ Oats, <%= array_to_sentence_string ["peas", "beans", "barley"] %> grow.
 <%= item[:value] %>
 <% end %>
 ---
+
+<%= render DsdComponent.new do %>
+  <p>Default slot content.</p>
+<% end %>

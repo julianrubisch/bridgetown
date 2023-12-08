@@ -33,7 +33,6 @@ module Bridgetown
 
       def healthy?(site)
         [
-          fsnotify_buggy?(site),
           !conflicting_urls(site),
           !urls_only_differ_by_case(site),
           proper_site_url?(site),
@@ -51,52 +50,36 @@ module Bridgetown
                                "Detected '_posts' directory outside custom `collections_dir`!"
         Bridgetown.logger.warn "",
                                "Please move '#{posts_at_root}' into the custom directory at " \
-              "'#{site.in_source_dir(site.config["collections_dir"])}'"
+                               "'#{site.in_source_dir(site.config["collections_dir"])}'"
         false
       end
 
       def conflicting_urls(site)
         conflicting_urls = false
         urls = {}
-        urls = collect_urls(urls, site.pages, site.dest)
-        urls = collect_urls(urls, site.posts.docs, site.dest)
+        urls = collect_urls(urls, site.contents, site.dest)
         urls.each do |url, paths|
           next unless paths.size > 1
 
           conflicting_urls = true
-          Bridgetown.logger.warn "Conflict:", "The URL '#{url}' is the destination" \
-            " for the following pages: #{paths.join(", ")}"
+          Bridgetown.logger.warn "Conflict:", "The URL '#{url}' is the destination " \
+                                              "for the following pages: #{paths.join(", ")}"
         end
         conflicting_urls
       end
 
-      def fsnotify_buggy?(_site)
-        return true unless Utils::Platforms.osx?
-
-        if Dir.pwd != `pwd`.strip
-          Bridgetown.logger.error "  " + <<-STR.strip.gsub(%r!\n\s+!, "\n  ")
-            We have detected that there might be trouble using fsevent on your
-            operating system, you can read https://github.com/thibaudgg/rb-fsevent/wiki/no-fsevents-fired-(OSX-bug)
-            for possible work arounds or you can work around it immediately
-            with `--force-polling`.
-          STR
-
-          false
-        end
-
-        true
-      end
-
       def urls_only_differ_by_case(site)
         urls_only_differ_by_case = false
-        urls = case_insensitive_urls(site.pages + site.docs_to_write, site.dest)
+        urls = case_insensitive_urls(site.resources, site.dest)
         urls.each_value do |real_urls|
           next unless real_urls.uniq.size > 1
 
           urls_only_differ_by_case = true
-          Bridgetown.logger.warn "Warning:", "The following URLs only differ" \
-            " by case. On a case-insensitive file system one of the URLs" \
-            " will be overwritten by the other: #{real_urls.join(", ")}"
+          Bridgetown.logger.warn(
+            "Warning:",
+            "The following URLs only differ by case. On a case-insensitive file system one of " \
+            "the URLs will be overwritten by the other: #{real_urls.join(", ")}"
+          )
         end
         urls_only_differ_by_case
       end
@@ -114,7 +97,11 @@ module Bridgetown
 
       def collect_urls(urls, things, destination)
         things.each do |thing|
-          dest = thing.destination(destination)
+          dest = if thing.method(:destination).arity == 1
+                   thing.destination(destination)
+                 else
+                   thing.destination
+                 end
           if urls[dest]
             urls[dest] << thing.path
           else
@@ -124,18 +111,18 @@ module Bridgetown
         urls
       end
 
-      def case_insensitive_urls(things, destination)
+      def case_insensitive_urls(things, _destination)
         things.each_with_object({}) do |thing, memo|
-          dest = thing.destination(destination)
-          (memo[dest.downcase] ||= []) << dest
+          dest = thing.destination&.output_path
+          (memo[dest.downcase] ||= []) << dest if dest
         end
       end
 
       def url_exists?(url)
         return true unless url.nil? || url.empty?
 
-        Bridgetown.logger.warn "Warning:", "You didn't set an URL in the config file, "\
-            "you may encounter problems with some plugins."
+        Bridgetown.logger.warn "Warning:", "You didn't set an URL in the config file, " \
+                                           "you may encounter problems with some plugins."
         false
       end
 
@@ -145,16 +132,16 @@ module Bridgetown
       # Addressable::URI#parse only raises a TypeError
       # https://git.io/vFfbx
       rescue TypeError
-        Bridgetown.logger.warn "Warning:", "The site URL does not seem to be valid, "\
-            "check the value of `url` in your config file."
+        Bridgetown.logger.warn "Warning:", "The site URL does not seem to be valid, " \
+                                           "check the value of `url` in your config file."
         false
       end
 
       def url_absolute(url)
         return true if url.is_a?(String) && Addressable::URI.parse(url).absolute?
 
-        Bridgetown.logger.warn "Warning:", "Your site URL does not seem to be absolute, "\
-            "check the value of `url` in your config file."
+        Bridgetown.logger.warn "Warning:", "Your site URL does not seem to be absolute, " \
+                                           "check the value of `url` in your config file."
         false
       end
     end

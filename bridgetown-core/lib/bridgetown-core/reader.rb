@@ -2,34 +2,50 @@
 
 module Bridgetown
   class Reader
+    # @return [Bridgetown::Site]
     attr_reader :site
 
+    # @param site [Bridgetown::Site]
     def initialize(site)
       @site = site
     end
 
-    # Read Site data from disk and load it into internal data structures.
-    #
-    # Returns nothing.
-    # rubocop:disable Metrics/AbcSize
+    # Read data and resources from disk and load it into internal data structures.
+    # @return [void]
     def read
-      @site.defaults_reader.read
-      @site.layouts = LayoutReader.new(site).read
+      site.defaults_reader.read
+      site.data = site.collections.data.read.merge_data_resources
+      read_layouts
       read_directories
-      read_included_excludes
+      read_includes
       sort_files!
-      @site.data = DataReader.new(site).read(site.config["data_dir"])
-      CollectionReader.new(site).read
-      Bridgetown::PluginManager.source_manifests.map(&:content).compact.each do |plugin_content_dir|
-        PluginContentReader.new(site, plugin_content_dir).read
+      read_collections
+      site.config.source_manifests.select(&:content).each do |manifest|
+        PluginContentReader.new(site, manifest).read
       end
     end
-    # rubocop:enable Metrics/AbcSize
 
-    # Sorts posts, pages, and static files.
+    # Read in layouts
+    # @see LayoutReader
+    # @return [void]
+    def read_layouts
+      site.layouts = LayoutReader.new(site).read
+    end
+
+    # Read in collections (other than the data collection)
+    # @return [void]
+    def read_collections
+      site.collections.each_value do |collection|
+        next if collection.data?
+
+        collection.read
+      end
+    end
+
+    # Sorts generated pages and static files.
+    # @return [void]
     def sort_files!
-      site.collections.each_value { |c| c.docs.sort! }
-      site.pages.sort_by!(&:name)
+      site.generated_pages.sort_by!(&:name)
       site.static_files.sort_by!(&:relative_path)
     end
 
@@ -37,83 +53,70 @@ module Bridgetown
     # that will become part of the site according to the rules in
     # filter_entries.
     #
-    # dir - The String relative path of the directory to read. Default: ''.
-    #
-    # Returns nothing.
+    # @param dir [String] relative path of the directory to read. Default: ''
+    # @return [void]
     def read_directories(dir = "")
       base = site.in_source_dir(dir)
 
       return unless File.directory?(base)
 
-      dot_dirs = []
-      dot_pages = []
-      dot_static_files = []
+      entries_dirs = []
+      entries_pages = []
+      entries_static_files = []
 
-      dot = Dir.chdir(base) { filter_entries(Dir.entries("."), base) }
-      dot.each do |entry|
+      entries = Dir.chdir(base) { filter_entries(Dir.entries("."), base) }
+      entries.each do |entry|
         file_path = @site.in_source_dir(base, entry)
         if File.directory?(file_path)
-          dot_dirs << entry
-        elsif Utils.has_yaml_header?(file_path)
-          dot_pages << entry
+          entries_dirs << entry
+        elsif Utils.has_yaml_header?(file_path) || Utils.has_rbfm_header?(file_path)
+          entries_pages << entry
         else
-          dot_static_files << entry
+          entries_static_files << entry
         end
       end
 
-      retrieve_posts(dir)
-      retrieve_dirs(base, dir, dot_dirs)
-      retrieve_pages(dir, dot_pages)
-      retrieve_static_files(dir, dot_static_files)
-    end
-
-    # Retrieves all the posts(posts) from the given directory
-    # and add them to the site and sort them.
-    #
-    # dir - The String representing the directory to retrieve the posts from.
-    #
-    # Returns nothing.
-    def retrieve_posts(dir)
-      return if outside_configured_directory?(dir)
-
-      post_reader.read_posts(dir)
+      retrieve_dirs(dir, entries_dirs)
+      retrieve_pages(dir, entries_pages)
+      retrieve_static_files(dir, entries_static_files)
     end
 
     # Recursively traverse directories with the read_directories function.
     #
-    # base - The String representing the site's base directory.
-    # dir - The String representing the directory to traverse down.
-    # dot_dirs - The Array of subdirectories in the dir.
-    #
-    # Returns nothing.
-    def retrieve_dirs(_base, dir, dot_dirs)
-      dot_dirs.each do |file|
+    # @param dir [String] the directory to traverse down
+    # @param entries_dirs [Array<String>] subdirectories in the directory
+    # @return [void]
+    def retrieve_dirs(dir, entries_dirs)
+      entries_dirs.each do |file|
         dir_path = site.in_source_dir(dir, file)
-        rel_path = PathManager.join(dir, file)
-        @site.reader.read_directories(rel_path) unless @site.dest.chomp("/") == dir_path
+        rel_path = File.join(dir, file)
+        read_directories(rel_path) unless @site.destination.chomp("/") == dir_path
       end
     end
 
     # Retrieve all the pages from the current directory,
     # add them to the site and sort them.
     #
-    # dir - The String representing the directory retrieve the pages from.
-    # dot_pages - The Array of pages in the dir.
-    #
-    # Returns nothing.
-    def retrieve_pages(dir, dot_pages)
-      site.pages.concat(PageReader.new(site, dir).read(dot_pages))
+    # @param dir [String] the directory to retrieve the pages from
+    # @param entries_pages [Array<String>] page paths in the directory
+    # @return [void]
+    def retrieve_pages(dir, entries_pages)
+      entries_pages.each do |page_path|
+        site.collections.pages.read_resource(site.in_source_dir(dir, page_path))
+      end
     end
 
     # Retrieve all the static files from the current directory,
     # add them to the site and sort them.
     #
-    # dir - The directory retrieve the static files from.
-    # dot_static_files - The static files in the dir.
-    #
-    # Returns nothing.
-    def retrieve_static_files(dir, dot_static_files)
-      site.static_files.concat(StaticFileReader.new(site, dir).read(dot_static_files))
+    # @param dir [String] The directory retrieve the static files from.
+    # @param files [Array<String>] The static files in the dir.
+    def retrieve_static_files(dir, files)
+      site.static_files.concat(
+        files.map do |file|
+          StaticFile.new(site, site.source, dir, file)
+        end
+      )
     end
 
     # Filter out any files/directories that are hidden or backup files (start
@@ -121,18 +124,18 @@ module Bridgetown
     # or are excluded in the site configuration, unless they are web server
     # files such as '.htaccess'.
     #
-    # entries - The Array of String file/directory entries to filter.
-    # base_directory - The string representing the optional base directory.
+    # @param entries [Array<String>] file/directory entries to filter
+    # @param base_directory [String] optional base directory
     #
     # Returns the Array of filtered entries.
     def filter_entries(entries, base_directory = nil)
-      EntryFilter.new(site, base_directory).filter(entries)
+      EntryFilter.new(site, base_directory: base_directory).filter(entries)
     end
 
     # Read the entries from a particular directory for processing
     #
-    # dir - The String representing the relative path of the directory to read.
-    # subfolder - The String representing the directory to read.
+    # @param dir [String] parent directory
+    # @param subfolder [String] the directory to read
     #
     # Returns the list of entries to process
     def get_entries(dir, subfolder)
@@ -145,34 +148,12 @@ module Bridgetown
 
     private
 
-    # Internal
-    #
-    # Determine if the directory is supposed to contain posts.
-    # If the user has defined a custom collections_dir, then attempt to read
-    # posts only from within that directory.
-    #
-    # Returns true if a custom collections_dir has been set but current directory lies
-    # outside that directory.
-    def outside_configured_directory?(dir)
-      collections_dir = site.config["collections_dir"]
-      !collections_dir.empty? && !dir.start_with?("/#{collections_dir}")
-    end
-
-    # Create a single PostReader instance to retrieve posts from all valid
-    # directories in current site.
-    def post_reader
-      @post_reader ||= PostReader.new(site)
-    end
-
-    def read_included_excludes
-      entry_filter = EntryFilter.new(site)
-
-      site.include.each do |entry|
+    def read_includes
+      site.config.include.each do |entry|
         next if entry == ".htaccess"
 
         entry_path = site.in_source_dir(entry)
         next if File.directory?(entry_path)
-        next if entry_filter.symlink?(entry_path)
 
         read_included_file(entry_path) if File.file?(entry_path)
       end
@@ -181,11 +162,7 @@ module Bridgetown
     def read_included_file(entry_path)
       dir  = File.dirname(entry_path).sub(site.source, "")
       file = Array(File.basename(entry_path))
-      if Utils.has_yaml_header?(entry_path)
-        site.pages.concat(PageReader.new(site, dir).read(file))
-      else
-        site.static_files.concat(StaticFileReader.new(site, dir).read(file))
-      end
+      retrieve_static_files(dir, file)
     end
   end
 end

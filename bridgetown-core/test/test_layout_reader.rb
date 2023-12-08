@@ -5,15 +5,14 @@ require "helper"
 class TestLayoutReader < BridgetownUnitTest
   context "reading layouts" do
     setup do
-      config = Bridgetown::Configuration::DEFAULTS.merge("source"      => source_dir,
-                                                         "destination" => dest_dir)
-      @site = fixture_site(config)
+      @site = fixture_site
     end
 
     should "read layouts" do
       layouts = LayoutReader.new(@site).read
       assert_equal ["default",
                     "erblayout",
+                    "serblayout",
                     "example/overridden_layout",
                     "example/test_layout",
                     "simple",

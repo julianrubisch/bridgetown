@@ -16,8 +16,10 @@ end
 
 # rubygems
 require "rubygems"
+require "bundler/shared_helpers"
 
 # stdlib
+require "find"
 require "forwardable"
 require "fileutils"
 require "time"
@@ -27,22 +29,36 @@ require "logger"
 require "set"
 require "csv"
 require "json"
+require "yaml"
 
 # 3rd party
+require "active_support"
+require "active_support/core_ext/class/attribute"
+require "active_support/core_ext/hash/keys"
+require "active_support/core_ext/module/delegation"
 require "active_support/core_ext/object/blank"
+require "active_support/core_ext/object/deep_dup"
+require "active_support/core_ext/object/inclusion"
 require "active_support/core_ext/string/inflections"
+require "active_support/core_ext/string/inquiry"
+require "active_support/core_ext/string/output_safety"
+require "active_support/core_ext/string/starts_ends_with"
+require "active_support/current_attributes"
+require "active_support/descendants_tracker"
 require "hash_with_dot_access"
-require "pathutil"
 require "addressable/uri"
-require "safe_yaml/load"
 require "liquid"
-require "liquid-render-tag"
-require "liquid-component"
+require "listen"
 require "kramdown"
 require "colorator"
 require "i18n"
+require "i18n/backend/fallbacks"
 require "faraday"
 require "thor"
+require "zeitwerk"
+
+# Ensure we can set up fallbacks so the default locale gets used
+I18n::Backend::Simple.include I18n::Backend::Fallbacks
 
 module HashWithDotAccess
   class Hash # :nodoc:
@@ -52,69 +68,47 @@ module HashWithDotAccess
   end
 end
 
-SafeYAML::OPTIONS[:suppress_warnings] = true
-
 # Create our little String subclass for Ruby Front Matter
 class Rb < String; end
-SafeYAML::OPTIONS[:whitelisted_tags] = ["!ruby/string:Rb"]
-
-if RUBY_VERSION.start_with?("3.0")
-  # workaround for Ruby 3 preview 2, maybe can remove later
-  # rubocop:disable Style/GlobalVars
-  old_verbose = $VERBOSE
-  $VERBOSE = nil
-  SafeYAML::SafeToRubyVisitor.const_set(:INITIALIZE_ARITY, 2)
-  $verbose = old_verbose
-  # rubocop:enable Style/GlobalVars
-end
 
 module Bridgetown
-  # internal requires
+  autoload :Cache,               "bridgetown-core/cache"
+  autoload :Current,             "bridgetown-core/current"
   autoload :Cleaner,             "bridgetown-core/cleaner"
   autoload :Collection,          "bridgetown-core/collection"
-  autoload :Configuration,       "bridgetown-core/configuration"
-  autoload :DataAccessible,      "bridgetown-core/concerns/data_accessible"
+  autoload :Component,           "bridgetown-core/component"
+  autoload :DefaultsReader,      "bridgetown-core/readers/defaults_reader"
   autoload :Deprecator,          "bridgetown-core/deprecator"
-  autoload :Document,            "bridgetown-core/document"
   autoload :EntryFilter,         "bridgetown-core/entry_filter"
+  # TODO: we have too many errors! This is silly
   autoload :Errors,              "bridgetown-core/errors"
-  autoload :Excerpt,             "bridgetown-core/excerpt"
-  autoload :External,            "bridgetown-core/external"
   autoload :FrontmatterDefaults, "bridgetown-core/frontmatter_defaults"
+  autoload :FrontMatterImporter, "bridgetown-core/concerns/front_matter_importer"
+  autoload :GeneratedPage,       "bridgetown-core/generated_page"
   autoload :Hooks,               "bridgetown-core/hooks"
   autoload :Layout,              "bridgetown-core/layout"
   autoload :LayoutPlaceable,     "bridgetown-core/concerns/layout_placeable"
-  autoload :Cache,               "bridgetown-core/cache"
-  autoload :CollectionReader,    "bridgetown-core/readers/collection_reader"
-  autoload :DataReader,          "bridgetown-core/readers/data_reader"
-  autoload :DefaultsReader,      "bridgetown-core/readers/defaults_reader"
   autoload :LayoutReader,        "bridgetown-core/readers/layout_reader"
-  autoload :PostReader,          "bridgetown-core/readers/post_reader"
-  autoload :PageReader,          "bridgetown-core/readers/page_reader"
-  autoload :PluginContentReader, "bridgetown-core/readers/plugin_content_reader"
-  autoload :StaticFileReader,    "bridgetown-core/readers/static_file_reader"
-  autoload :LogAdapter,          "bridgetown-core/log_adapter"
-  autoload :Page,                "bridgetown-core/page"
-  autoload :PageWithoutAFile,    "bridgetown-core/page_without_a_file"
-  autoload :PathManager,         "bridgetown-core/path_manager"
-  autoload :PluginManager,       "bridgetown-core/plugin_manager"
-  autoload :Publishable,         "bridgetown-core/concerns/publishable"
-  autoload :Publisher,           "bridgetown-core/publisher"
-  autoload :Reader,              "bridgetown-core/reader"
-  autoload :Regenerator,         "bridgetown-core/regenerator"
-  autoload :RelatedPosts,        "bridgetown-core/related_posts"
-  autoload :Renderer,            "bridgetown-core/renderer"
   autoload :LiquidRenderable,    "bridgetown-core/concerns/liquid_renderable"
+  autoload :Localizable,         "bridgetown-core/concerns/localizable"
   autoload :LiquidRenderer,      "bridgetown-core/liquid_renderer"
+  autoload :LogAdapter,          "bridgetown-core/log_adapter"
+  autoload :PluginContentReader, "bridgetown-core/readers/plugin_content_reader"
+  autoload :PluginManager,       "bridgetown-core/plugin_manager"
+  autoload :Prioritizable,       "bridgetown-core/concerns/prioritizable"
+  autoload :Publishable,         "bridgetown-core/concerns/publishable"
+  autoload :Reader,              "bridgetown-core/reader"
   autoload :RubyTemplateView,    "bridgetown-core/ruby_template_view"
   autoload :LogWriter,           "bridgetown-core/log_writer"
   autoload :Site,                "bridgetown-core/site"
+  autoload :Slot,                "bridgetown-core/slot"
   autoload :StaticFile,          "bridgetown-core/static_file"
+  autoload :Transformable,       "bridgetown-core/concerns/transformable"
   autoload :URL,                 "bridgetown-core/url"
   autoload :Utils,               "bridgetown-core/utils"
-  autoload :Validatable,         "bridgetown-core/concerns/validatable"
   autoload :VERSION,             "bridgetown-core/version"
   autoload :Watcher,             "bridgetown-core/watcher"
+  autoload :YAMLParser,          "bridgetown-core/yaml_parser"
 
   # extensions
   require "bridgetown-core/commands/registrations"
@@ -124,21 +118,32 @@ module Bridgetown
   require "bridgetown-core/liquid_extensions"
   require "bridgetown-core/filters"
 
+  require "bridgetown-core/configuration"
   require "bridgetown-core/drops/drop"
-  require "bridgetown-core/drops/document_drop"
+  require "bridgetown-core/drops/resource_drop"
   require_all "bridgetown-core/converters"
   require_all "bridgetown-core/converters/markdown"
   require_all "bridgetown-core/drops"
   require_all "bridgetown-core/generators"
   require_all "bridgetown-core/tags"
+  require_all "bridgetown-core/core_ext"
 
   class << self
     # Tells you which Bridgetown environment you are building in so
     #   you can skip tasks if you need to.
     def environment
-      ENV["BRIDGETOWN_ENV"] || "development"
+      (ENV["BRIDGETOWN_ENV"] || "development").inquiry
     end
     alias_method :env, :environment
+
+    # Set up the Bridgetown execution environment before attempting to load any
+    # plugins or gems prior to a site build
+    def begin!
+      ENV["RACK_ENV"] ||= environment
+
+      Bridgetown::Current.preloaded_configuration = Bridgetown::Configuration::Preflight.new
+      Bridgetown::PluginManager.setup_bundler
+    end
 
     # Generate a Bridgetown configuration hash by merging the default
     #   options with anything in bridgetown.config.yml, and adding the given
@@ -152,22 +157,136 @@ module Bridgetown
     # @return [Hash] The final configuration hash.
     def configuration(override = {})
       config = Configuration.new
-      override = Configuration[override].stringify_keys
+      override = Configuration.new(override)
       unless override.delete("skip_config_files")
         config = config.read_config_files(config.config_files(override))
       end
 
       # Merge DEFAULTS < bridgetown.config.yml < override
+      # @param obj [Bridgetown::Configuration]
       Configuration.from(Utils.deep_merge_hashes(config, override)).tap do |obj|
         set_timezone(obj["timezone"]) if obj["timezone"]
+
+        # Copy "global" source manifests and initializers into this new configuration
+        if Bridgetown::Current.preloaded_configuration.is_a?(Bridgetown::Configuration::Preflight)
+          obj.source_manifests = Bridgetown::Current.preloaded_configuration.source_manifests
+
+          if Bridgetown::Current.preloaded_configuration.initializers
+            obj.initializers = Bridgetown::Current.preloaded_configuration.initializers
+          end
+        end
+
+        Bridgetown::Current.preloaded_configuration = obj
       end
     end
 
-    # Conveinence method to register a new Thor command
+    # Initialize a preflight configuration object, copying initializers and
+    # source manifests from a previous standard configuration if necessary.
+    # Typically only needed in test suites to reset before a new test.
+    #
+    # @return [Bridgetown::Configuration::Preflight]
+    def reset_configuration! # rubocop:disable Metrics/AbcSize
+      if Bridgetown::Current.preloaded_configuration.nil?
+        return Bridgetown::Current.preloaded_configuration =
+                 Bridgetown::Configuration::Preflight.new
+      end
+
+      return unless Bridgetown::Current.preloaded_configuration.is_a?(Bridgetown::Configuration)
+
+      previous_config = Bridgetown::Current.preloaded_configuration
+      new_config = Bridgetown::Configuration::Preflight.new
+      new_config.initializers = previous_config.initializers
+      new_config.source_manifests = previous_config.source_manifests
+      if new_config.initializers
+        new_config.initializers.delete(:init)
+        new_config.initializers.select! do |_k, initializer|
+          next false if initializer.block.source_location[0].start_with?(
+            File.join(previous_config.root_dir, "config")
+          )
+
+          initializer.completed = false
+          true
+        end
+      end
+
+      Bridgetown::Current.preloaded_configuration = new_config
+    end
+
+    def initializer(name, prepend: false, replace: false, &block) # rubocop:todo Metrics
+      unless Bridgetown::Current.preloaded_configuration
+        raise "The `#{name}' initializer in #{block.source_location[0]} was called " \
+              "without a preloaded configuration"
+      end
+
+      Bridgetown::Current.preloaded_configuration.initializers ||= {}
+
+      if Bridgetown::Current.preloaded_configuration.initializers.key?(name.to_sym)
+        if replace
+          Bridgetown.logger.warn(
+            "Initializing:",
+            "The previous `#{name}' initializer was replaced by a new initializer"
+          )
+        else
+          prev_block = Bridgetown::Current.preloaded_configuration.initializers[name.to_sym].block
+          new_block = block
+          block = if prepend
+                    proc do |*args, **kwargs|
+                      new_block.(*args, **kwargs)
+                      prev_block.(*args, **kwargs)
+                    end
+                  else
+                    proc do |*args, **kwargs|
+                      prev_block.(*args, **kwargs)
+                      new_block.(*args, **kwargs)
+                    end
+                  end
+        end
+      end
+
+      Bridgetown::Current.preloaded_configuration.initializers[name.to_sym] =
+        Bridgetown::Configuration::Initializer.new(
+          name: name.to_sym,
+          block: block,
+          completed: false
+        )
+    end
+
+    # @yieldself [Bridgetown::Configuration::ConfigurationDSL]
+    def configure(&block)
+      initializer :init, &block
+    end
+
+    # Convenience method to register a new Thor command
     #
     # @see Bridgetown::Commands::Registrations.register
     def register_command(&block)
       Bridgetown::Commands::Registrations.register(&block)
+    end
+
+    def load_tasks
+      require "bridgetown-core/commands/base"
+      unless Bridgetown::Current.preloaded_configuration
+        Bridgetown::Current.preloaded_configuration = Bridgetown::Configuration::Preflight.new
+      end
+      Bridgetown::PluginManager.setup_bundler(skip_yarn: true)
+
+      if Bridgetown::Current.preloaded_configuration.is_a?(Bridgetown::Configuration::Preflight)
+        Bridgetown::Current.preloaded_configuration = Bridgetown.configuration
+      end
+      load File.expand_path("bridgetown-core/tasks/bridgetown_tasks.rake", __dir__)
+    end
+
+    # Loads ENV configuration via dotenv gem, if available
+    #
+    # @param root [String] root of Bridgetown site
+    def load_dotenv(root:)
+      dotenv_files = [
+        File.join(root, ".env.#{Bridgetown.env}.local"),
+        (File.join(root, ".env.local") unless Bridgetown.env.test?),
+        File.join(root, ".env.#{Bridgetown.env}"),
+        File.join(root, ".env"),
+      ].compact
+      Dotenv.load(*dotenv_files)
     end
 
     # Determines the correct Bundler environment block method to use and passes
@@ -189,12 +308,16 @@ module Bridgetown
     # @return [void]
     # rubocop:disable Naming/AccessorMethodName
     def set_timezone(timezone)
-      ENV["TZ"] = if Utils::Platforms.really_windows?
-                    Utils::WinTZ.calculate(timezone)
-                  else
-                    timezone
-                  end
+      ENV["TZ"] = timezone
     end
+
+    # Get the current TZ environment variable
+    #
+    # @return [String]
+    def timezone
+      ENV["TZ"]
+    end
+
     # rubocop:enable Naming/AccessorMethodName
 
     # Fetch the logger instance for this Bridgetown process.
@@ -214,11 +337,15 @@ module Bridgetown
       @logger = LogAdapter.new(writer, (ENV["BRIDGETOWN_LOG_LEVEL"] || :info).to_sym)
     end
 
-    # An array of sites. Currently only ever a single entry.
+    # Deprecated. Now using the Current site.
     #
     # @return [Array<Bridgetown::Site>] the Bridgetown sites created.
     def sites
-      @sites ||= []
+      Deprecator.deprecation_message(
+        "Bridgetown.sites will be removed in the next version. Use Bridgetown::Current.sites" \
+        "instead"
+      )
+      [Bridgetown::Current.site].compact
     end
 
     # Ensures the questionable path is prefixed with the base directory
@@ -251,7 +378,40 @@ module Bridgetown
       end
     end
 
-    # Conditional optimizations
-    Bridgetown::External.require_if_present("liquid/c")
+    # When there's a build error, error details will be logged to a file which the dev server
+    #   can read and pass along to the browser.
+    #
+    # @return [String] the path to the cached errors file
+    def build_errors_path
+      File.join(
+        (Bridgetown::Current.site&.config || Bridgetown::Current.preloaded_configuration).root_dir,
+        ".bridgetown-cache",
+        "build_errors.txt"
+      )
+    end
   end
 end
+
+module Bridgetown
+  module Model; end
+
+  module Resource
+    def self.register_extension(mod)
+      if mod.const_defined?(:LiquidResource)
+        Bridgetown::Drops::ResourceDrop.include mod.const_get(:LiquidResource)
+      end
+      if mod.const_defined?(:RubyResource) # rubocop:disable Style/GuardClause
+        Bridgetown::Resource::Base.include mod.const_get(:RubyResource)
+      end
+    end
+  end
+end
+
+# This method is available in Ruby 3, monkey patching for older versions
+Psych.extend Bridgetown::CoreExt::Psych::SafeLoadFile unless Psych.respond_to?(:safe_load_file)
+
+loader = Zeitwerk::Loader.new
+loader.push_dir File.join(__dir__, "bridgetown-core/model"), namespace: Bridgetown::Model
+loader.push_dir File.join(__dir__, "bridgetown-core/resource"), namespace: Bridgetown::Resource
+loader.setup # ready!
+Bridgetown::Model::Origin # this needs to load first

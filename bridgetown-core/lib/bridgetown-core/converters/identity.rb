@@ -7,6 +7,8 @@ module Bridgetown
     class Identity < Converter
       priority :lowest
 
+      support_slots
+
       # Public: Does the given extension match this converter's list of acceptable extensions?
       # Takes one argument: the file's extension (including the dot).
       #
@@ -24,15 +26,6 @@ module Bridgetown
       # Returns The String output file extension.
       def output_ext(ext)
         ext
-      end
-
-      # Logic to do the content conversion.
-      #
-      # content - String content of file (without front matter).
-      #
-      # Returns a String of the converted content.
-      def convert(content)
-        content
       end
     end
   end

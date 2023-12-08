@@ -7,6 +7,8 @@ module Bridgetown
     include URLFilters
     include GroupingFilters
     include DateFilters
+    include LocalizationFilters
+    include TranslationFilters
     include ConditionHelpers
 
     # Convert a Markdown string into HTML output.
@@ -26,33 +28,7 @@ module Bridgetown
     #
     # Returns the smart-quotified String.
     def smartify(input)
-      @context.registers[:site].find_converter_instance(
-        Bridgetown::Converters::SmartyPants
-      ).convert(input.to_s)
-    end
-
-    # TODO: This should be removed, there is no Sass converter
-    # Convert a Sass string into CSS output.
-    #
-    # input - The Sass String to convert.
-    #
-    # Returns the CSS formatted String.
-    def sassify(input)
-      @context.registers[:site].find_converter_instance(
-        Bridgetown::Converters::Sass
-      ).convert(input)
-    end
-
-    # TODO: This should be removed, there is no Scss converter
-    # Convert a Scss string into CSS output.
-    #
-    # input - The Scss String to convert.
-    #
-    # Returns the CSS formatted String.
-    def scssify(input)
-      @context.registers[:site].find_converter_instance(
-        Bridgetown::Converters::Scss
-      ).convert(input)
+      Utils::SmartyPantsConverter.new(@context.registers[:site].config).convert(input.to_s)
     end
 
     # Slugify a filename or title.
@@ -63,6 +39,7 @@ module Bridgetown
     # Returns the given filename or title as a lowercase URL String.
     # See Utils.slugify for more detail.
     def slugify(input, mode = nil)
+      mode = @context.registers[:site].config.slugify_mode if mode.nil?
       Utils.slugify(input, mode: mode)
     end
 
@@ -102,7 +79,7 @@ module Bridgetown
     #
     # Returns the escaped String.
     def cgi_escape(input)
-      CGI.escape(input)
+      CGI.escape(input.to_s)
     end
 
     # URI escape a string.
@@ -126,12 +103,12 @@ module Bridgetown
     # @return [String] a link unreadable for bots but will be recovered on focus or mouseover
     def obfuscate_link(input, prefix = "mailto")
       link = "<a href=\"#{prefix}:#{input}\">#{input}</a>"
-      script = "<script type=\"text/javascript\">document.currentScript.insertAdjacentHTML("
-      script += "beforebegin', '#{rot47(link).gsub(%r!\\!, '\\\\\\')}'.replace(/[!-~]/g,"
+      script = "<script type=\"text/javascript\">document.currentScript.insertAdjacentHTML('"
+      script += "beforebegin', '#{rot47(link).gsub("\\", '\\\\\\')}'.replace(/[!-~]/g," # rubocop:disable Style/StringLiteralsInInterpolation
       script += "function(c){{var j=c.charCodeAt(0);if((j>=33)&&(j<=126)){"
       script += "return String.fromCharCode(33+((j+ 14)%94));}"
       script += "else{return String.fromCharCode(j);}}}));</script>"
-      script
+      script.html_safe
     end
 
     # Replace any whitespace in the input string with a single space
@@ -203,7 +180,7 @@ module Bridgetown
     #            their `#inspect` string object.
     #
     # Returns the filtered array of objects
-    def where(input, property, value)
+    def where(input, property, value) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       return input if !property || value.is_a?(Array) || value.is_a?(Hash)
       return input unless input.respond_to?(:select)
 
@@ -217,11 +194,9 @@ module Bridgetown
       @where_filter_cache[input_id][property] ||= {}
 
       # stash or retrive results to return
-      @where_filter_cache[input_id][property][value] ||= begin
-        input.select do |object|
-          compare_property_vs_target(item_property(object, property), value)
-        end.to_a
-      end
+      @where_filter_cache[input_id][property][value] ||= input.select do |object|
+        compare_property_vs_target(item_property(object, property), value)
+      end.to_a
     end
 
     # Filters an array of objects against an expression
@@ -270,13 +245,14 @@ module Bridgetown
       if property.nil?
         input.sort
       else
-        if nils == "first"
+        case nils
+        when "first"
           order = - 1
-        elsif nils == "last"
+        when "last"
           order = + 1
         else
           raise ArgumentError, "Invalid nils order: " \
-            "'#{nils}' is not a valid nils order. It must be 'first' or 'last'."
+                               "'#{nils}' is not a valid nils order. It must be 'first' or 'last'."
         end
 
         sort_input(input, property, order)
@@ -350,7 +326,7 @@ module Bridgetown
     # If the property doesn't exist, return the sort order respective of
     # which item doesn't have the property.
     # We also utilize the Schwartzian transform to make this more efficient.
-    def sort_input(input, property, order)
+    def sort_input(input, property, order) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       input.map { |item| [item_property(item, property), item] }
         .sort! do |a_info, b_info|
           a_property = a_info.first
@@ -375,7 +351,7 @@ module Bridgetown
       case target
       when NilClass
         return true if property.nil?
-      when Liquid::Expression::MethodLiteral # `empty` or `blank`
+      when "" # aka `empty` or `blank`
         target = target.to_s
         return true if property == target || Array(property).join == target
       else
@@ -436,7 +412,7 @@ module Bridgetown
       case item
       when Hash
         pairs = item.map { |k, v| as_liquid([k, v]) }
-        Hash[pairs]
+        Hash[pairs] # rubocop:todo Style/HashConversion
       when Array
         item.map { |i| as_liquid(i) }
       else

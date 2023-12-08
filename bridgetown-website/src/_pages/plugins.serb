@@ -1,0 +1,65 @@
+~~~{%
+{
+  title: "Jazz Up Your Site with Themes & Plugins",
+  exclude_from_search: true,
+  plugins: -> do
+    ::Builders::Versions.cache.getset("plugins") do
+      endpoint = "https://api.github.com/search/repositories?q=topic:bridgetown-plugin%20archived:false&per_page=100"
+
+      conn = Faraday.new(
+        url: endpoint,
+        headers: {"Accept" => "application/vnd.github.v3+json"}
+      ) do |faraday|
+        if ENV["BRIDGETOWN_GITHUB_TOKEN"]
+          username, token = ENV["BRIDGETOWN_GITHUB_TOKEN"].split(":")
+          faraday.request :authorization, :basic, username, token
+        end
+      end
+      items = JSON.parse(conn.get.body)["items"].sort_by {|item| item["name"]}
+
+      items.each do |item|
+        branchname = item.fetch("default_branch", "master")
+        gem_url = "https://raw.githubusercontent.com/#{item["full_name"]}/#{branchname}/lib/#{item["name"]}/version.rb"
+        result = Faraday.get(gem_url).body
+        begin
+          item["gem_version"] = result.match(/VERSION = "(.*?)"/)[1]
+        rescue NoMethodError
+        end
+      end
+    end
+  end
+}
+%}~~~
+
+<p>
+  Peruse our growing collection of official and third-party plugins which provide new capabilities to your Bridgetown site. If you've authored a <a href="/docs/plugins/#creating-a-gem">plugin gem</a>, add the <code>bridgetown-plugin</code> topic to your GitHub repo to include it here.
+</p>
+
+<ul class="info-grid">
+  {% page.data.plugins.each do |plugin| %}
+    <li><sl-card>
+      <div slot="header">
+        <a href="{{ plugin.html_url }}" style="text-decoration-thickness:1px; text-underline-offset: 0.18em">
+          <h3>
+            {{ plugin.name }}
+          </h3>
+        </a>
+      </div>
+
+      <p>{{ plugin.description }}</p>
+
+      <div slot="footer">
+        {% if plugin.gem_version %}
+          <ui-label class="tags" style="padding-right:0.5rem">
+            <sl-tag variant="success">v{{ plugin.gem_version }}</sl-tag>
+          </ui-label>
+        {% end %}
+
+        <ui-label>
+          <img src="{{ plugin.owner.avatar_url }}" alt="{{ plugin.owner.login }}" class="avatar" loading="lazy" />
+          <a href="{{ plugin.owner.html_url }}"rel="noopener">{{ plugin.owner.login }}</a>
+        </ul-layout>
+      </div>
+    </sl-card></li>
+  {% end %}
+</ul>

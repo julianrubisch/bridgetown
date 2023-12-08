@@ -6,6 +6,7 @@ module Bridgetown
       mutable true
 
       attr_accessor :page, :layout, :content, :paginator
+      alias_method :resource, :page
 
       def bridgetown
         BridgetownDrop.global
@@ -13,6 +14,10 @@ module Bridgetown
 
       def site
         @site_drop ||= SiteDrop.new(@obj)
+      end
+
+      def collections
+        @obj.collections
       end
 
       private

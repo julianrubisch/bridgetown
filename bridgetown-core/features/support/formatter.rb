@@ -9,27 +9,28 @@ module Bridgetown
   module Cucumber
     class Formatter
       attr_accessor :indent, :runtime
+
       include ::Cucumber::Formatter::Console
       include ::Cucumber::Formatter::Io
       include FileUtils
 
       CHARS = {
-        :failed    => "\u2718".red,
-        :pending   => "\u203D".yellow,
-        :undefined => "\u2718".red,
-        :passed    => "\u2714".green,
-        :skipped   => "\u203D".blue,
+        failed: "\u2718".red,
+        pending: "\u203D".yellow,
+        undefined: "\u2718".red,
+        passed: "\u2714".green,
+        skipped: "\u203D".blue,
       }.freeze
 
       #
 
-      def initialize(runtime, path_or_io, options)
-        @runtime = runtime
+      def initialize(config)
+        @runtime = nil
         @snippets_input = []
-        @io = ensure_io(path_or_io)
-        @prefixes = options[:prefixes] || {}
+        @io = ensure_io(config.out_stream, config.error_stream)
+        @prefixes = {}
         @delayed_messages = []
-        @options = options
+        @options = {}
         @exceptions = []
         @indent = 0
         @timings = {}
@@ -124,8 +125,8 @@ module Bridgetown
       #
 
       # rubocop:disable Metrics/ParameterLists
-      def before_step_result(_keyword, _step_match, _multiline_arg, status, exception, \
-              _source_indent, background, _file_colon_line)
+      def before_step_result(_keyword, _step_match, _multiline_arg, status, exception,
+                             _source_indent, background, _file_colon_line)
 
         @hide_this_step = false
         if exception
@@ -137,7 +138,7 @@ module Bridgetown
           @exceptions << exception
         end
 
-        if status != :failed && @in_background ^ background
+        if status != :failed && (@in_background ^ background)
           @hide_this_step = true
           return
         end
@@ -207,8 +208,8 @@ module Bridgetown
   end
 end
 
-AfterConfiguration do |config|
-  f = Bridgetown::Cucumber::Formatter.new(nil, $stdout, {})
+InstallPlugin do |config|
+  f = Bridgetown::Cucumber::Formatter.new(config)
 
   config.on_event :test_case_started do |event|
     f.print_feature_element_name(event.test_case)

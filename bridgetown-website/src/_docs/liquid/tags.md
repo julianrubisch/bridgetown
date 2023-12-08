@@ -1,22 +1,22 @@
 ---
 title: Liquid Tags
-hide_in_toc: true
+top_section: Designing Your Site
 order: 0
-category: liquid
+category: template-engines
 ---
 
 All of the standard Liquid
 [tags](https://shopify.github.io/liquid/tags/control-flow/) are supported.
 Bridgetown has a few built in tags to help you build your site. You can also create
-your own tags using [plugins]({{ '/docs/plugins/tags/' | relative_url }}).
+your own tags using [plugins](/docs/plugins/tags).
 
 ## Component rendering
 
-You can use the `render` and `rendercontent` tags to embed content and template partials into your main templates. [Read the documentation here](/docs/components).
+You can use the `render` and `rendercontent` tags to embed content and template partials into your main templates. [Read the documentation here](/docs/components/liquid).
 
 ## Find tag
 
-New in Bridgetown 0.17, you can now use the `find` tag to loop through a data object or collection and pull out one or more items to use in your Liquid template. Whereas before you could use the [`where_exp` filter](/docs/liquid/filters/#binary-operators-in-where_exp-filter){:data-no-swup="true"} to accomplish a similar purpose, this tag is more succinct and has support for single item variables.
+You can use the `find` tag to loop through a data object or collection and pull out one or more items to use in your Liquid template. Whereas before you could use the [`where_exp` filter](/docs/liquid/filters/#binary-operators-in-where_exp-filter) to accomplish a similar purpose, this tag is more succinct and has support for single item variables.
 
 The syntax of the tag is as follows:
 
@@ -36,7 +36,7 @@ For example, to find a single entry in the `albums` collection and assign it to 
 
 {% raw %}
 ```liquid
-{% find album in site.albums, band == page.band, year >= 1980, categories contains "Rock" %}
+{% find album in collections.albums.resources, band == resource.data.band, year >= 1980, categories contains "Rock" %}
 ```
 {% endraw %}
 
@@ -44,16 +44,16 @@ Or to find multiple items and assign that array to the variable `albums`:
 
 {% raw %}
 ```liquid
-{% find albums where site.albums, band == page.band, year >= 1980, categories contains "Rock" %}
+{% find albums where collections.albums.resources, band == resource.data.band, year >= 1980, categories contains "Rock" %}
 ```
 {% endraw %}
 
-Each expression (separated by a comma) adds an "AND" clause to the conditional logic. If you need OR logic instead, you can still use the `where_exp` filter, or you can write additional `find` tags and [concat](https://shopify.github.io/liquid/filters/concat/){:rel="noopener"} the arrays together (you'll probably also want to use the `uniq` filter to ensure you don't end up with duplicates).
+Each expression (separated by a comma) adds an "AND" clause to the conditional logic. If you need OR logic instead, you can still use the `where_exp` filter, or you can write additional `find` tags and [concat](https://shopify.github.io/liquid/filters/concat/) the arrays together (you'll probably also want to use the `uniq` filter to ensure you don't end up with duplicates).
 
 {% raw %}
 ```liquid
-{% find rock_albums where site.albums, band == page.band, year >= 1980, categories contains "Rock" %}
-{% find folk_albums where site.albums, band == page.band, year >= 1980, categories contains "Folk" %}
+{% find rock_albums where collections.albums.resources, band == resource.data.band, year >= 1980, categories contains "Rock" %}
+{% find folk_albums where collections.albums.resources, band == resource.data.band, year >= 1980, categories contains "Folk" %}
 
 {% assign albums = rock_albums | concat: folk_albums | uniq %}
 ```
@@ -65,28 +65,24 @@ If you've ever had to write a bunch of conditional code and variable assigns to 
 
 But not anymore! Introducing `class_map`:
 
-<!-- linthtml-configure tag-bans="false" -->
 {% raw %}
 ```liquid
-<div class="{% class_map has-centered-text: page.centered, is-small: small-var %}">
+<div class="{% class_map has-centered-text: resource.data.centered, is-small: small-var %}">
   …
 </div>
 ```
 {% endraw %}
-<!-- linthtml-configure tag-bans="true" -->
 
-In this example, the `class_map` tag will include `has-text-centered` only if `page.centered` is truthy, and likewise `is-small` only if `small-var` is truthy. If you need to run a comparison with a specific value, you'll still need to use `assign` but it'll still be simpler than in the past:
+In this example, the `class_map` tag will include `has-text-centered` only if `resource.data.centered` is truthy, and likewise `is-small` only if `small-var` is truthy. If you need to run a comparison with a specific value, you'll still need to use `assign` but it'll still be simpler than in the past:
 
-<!-- linthtml-configure tag-bans="false" -->
 {% raw %}
 ```liquid
-{% if product.feature_in == "socks" %}{% assign should_bold = true %}{% endif %}
+{% if product.data.feature_in == "socks" %}{% assign should_bold = true %}{% endif %}
 <div class="{% class_map product: true, bold-text: should_bold, float-right: true %}">
   …
 </div>
 ```
 {% endraw %}
-<!-- linthtml-configure tag-bans="true" -->
 
 ## Code snippet highlighting
 
@@ -108,22 +104,20 @@ language identifier. To find the appropriate identifier to use for the language
 you want to highlight, look for the “short name” on the [Rouge
 wiki](https://github.com/jayferd/rouge/wiki/List-of-supported-languages-and-lexers).
 
-{% rendercontent "docs/note",
-      type: "warning",
-      extra_margin: true,
-      title: "Bridgetown processes all Liquid filters in code blocks" %}
+{%@ Note type: :warning do %}
+  #### Bridgetown processes all Liquid filters in code blocks
 
   If you are using a language that contains curly braces, you will likely need to
   place <code>{&#37; raw &#37;}</code> and <code>{&#37; endraw &#37;}</code> tags
   around your code. If needed, you can add `render_with_liquid: false` in your
   front matter to disable Liquid entirely for a particular document.
-{% endrendercontent %}
+{% end %}
 
-{% rendercontent "docs/note" %}
+{%@ Note do %}
   You can also use fenced code blocks in Markdown (starting and ending with three
   backticks <code>```</code>) instead of using the `highlight` tag. However, the
   `highlight` tag includes additional features like line numbers (see below).
-{% endrendercontent %}
+{% end %}
 
 
 ### Line numbers
@@ -189,7 +183,7 @@ The path to the post, page, or collection is defined as the path relative to the
 
 For example, suppose you're creating a link in `page_a.md` (stored in `pages/folder1/folder2`) to `page_b.md` (stored in  `pages/folder1`). Your path in the link would not be `../page_b.html`. Instead, it would be `/pages/folder1/page_b.md`.
 
-If you're unsure of the path, add {% raw %}`{{ page.path }}`{% endraw %} to the page and it will display the path.
+If you're unsure of the path, add {% raw %}`{{ resource.relative_path }}`{% endraw %} to the page and it will display the path.
 
 One major benefit of using the `link` or `post_url` tag is link validation. If the link doesn't exist, Bridgetown won't build your site. This is a good thing, as it will alert you to a broken link so you can fix it (rather than allowing you to build and deploy a site with broken links).
 

@@ -1,8 +1,8 @@
 ---
 title: Prototype Pages
-order: 15
-top_section: Content
-category: prototype_pages
+order: 110
+top_section: Writing Content
+category: prototype-pages
 ---
 
 This feature builds upon the [Pagination functionality](/docs/content/pagination/) and
@@ -12,9 +12,9 @@ own page, every tag has its own page, or virtually any other search term.
 
 Note that in order to use [pagination](/docs/content/pagination/), you'll need to enable it your site's `bridgetown.config.yml`.
 
-{% toc %}
+{{ toc }}
 
-# Simple Usage
+## Simple Usage
 
 All you need to do is create a page, say `categories/category.html`, and add a
 `prototype` config to the Front Matter:
@@ -24,12 +24,13 @@ All you need to do is create a page, say `categories/category.html`, and add a
 layout: default
 title: Posts in category :prototype-term
 prototype:
+  collection: posts
   term: category
 ```
 
 And then all the site's different categories will have archives pages at this location
-(e.g. `categories/awesome-movies`, `categories/my-cool-vacation`, etc.). And it enables
-pagination automatically, so you'd just use `paginator.documents` to loop through the
+(e.g. `categories/awesome-movies`, `categories/my-cool-vacation`, etc.). It will enable
+pagination automatically, so you can use `paginator.resources` to loop through the
 posts like on any normal paginated page. Using `:prototype-term` in the page title will
 automatically put each archive page's term (aka the category name) in the output title.
 
@@ -45,19 +46,25 @@ If you want to "titleize" the search term in the processed `title` variable, use
 ---
 title: Posts in category :prototype-term-titleize
 prototype:
+  collection: posts
   term: category
 ```
 
 You'd get `Posts in category Cool Vacation` as the page title.
 
+{%@ Note type: "warning" do %}
+  #### Unspecified Class: Symbol Warning
+
+  If you would like `:prototype-term` or `:prototype-term-titleize` to appear first in the title, you must wrap the _whole_ title in quotes to avoid a parsing error.
+{% end %}
+
 In addition, the search term used for each generated page is placed into a Liquid
-variable, so you can use that as well in your template: `page.category`, or `page.tag`,
+variable, so you can use that as well in your template: `page.data.category`, or `page.data.tag`,
 etc.
 
 ## Searching in Collections
 
-You can also search in collections other than the default (posts) by including that in
-the prototype configuration:
+You can search in any custom collection by including that in the prototype configuration:
 
 `tigers/countries/country.html`
 ```yaml
@@ -79,11 +86,9 @@ This would produce a generated `tigers/countries/india` page that loops through
 all the tigers in `India`.
 
 
-# Pulling in Site Data
+## Pulling in Site Data
 
-Prototype pages can be configured to load in extra data from [data files](/docs/datafiles/)
-that are matched with the search term. This is great for common uses like listing out
-every post by each of the authors in the site.
+Prototype pages can be configured to load in extra data from [data files](/docs/datafiles/) which get matched with the search term for each item in the collection. This is great for common uses like listing out every post by each of the authors in the site.
 
 Here's an example of how that works:
 
@@ -111,20 +116,21 @@ jared:
 layout: default
 title: Articles by :prototype-data-label
 prototype:
+  collection: posts
   term: author
   data: authors
   data_label: name
 ---
 
 
-<h1>{{ page.title }}</h1> <-- Articles by Jared White -->
+<h1>{{ page.data.title }}</h1> <-- Articles by Jared White -->
 
-<h2>Twitter: @{{ page.author_data.twitter }}</h2> <!-- Twitter: @jaredcwhite -->
+<h2>Twitter: @{{ page.data.author_data.twitter }}</h2> <!-- Twitter: @jaredcwhite -->
 
 <!-- posts where author == jared -->
 
-{% for post in paginator.documents %}
-  {% include post.html %}
+{% for post in paginator.resources %}
+  {% render "shared/post", post: post %}
 {% endfor %}
 ```
 {% endraw %}
@@ -133,7 +139,7 @@ As you can image, the possibilities are endless!
 
 ## Permalinks
 
-You can also customize the [permalinks](/docs/structure/permalinks/) used in Prototype
+You can also customize the [permalinks](/docs/content/permalinks) used in Prototype
 pages using `:term`. For example, using the Tigers example above, you could change the
 URLs that get generated like so:
 

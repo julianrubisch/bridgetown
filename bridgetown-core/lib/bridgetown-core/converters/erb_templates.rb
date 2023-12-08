@@ -3,14 +3,26 @@
 require "tilt/erubi"
 
 module Bridgetown
-  class ERBBuffer < String
-    def concat_to_s(input)
-      concat input.to_s
+  class OutputBuffer < ActiveSupport::SafeBuffer
+    def initialize(*)
+      super
+      encode!
     end
 
-    alias_method :safe_append=, :concat_to_s
-    alias_method :append=, :concat_to_s
-    alias_method :safe_expr_append=, :concat_to_s
+    def <<(value)
+      return self if value.nil?
+
+      super(value.to_s)
+    end
+    alias_method :append=, :<<
+
+    def safe_expr_append=(val)
+      return self if val.nil? # rubocop:disable Lint/ReturnInVoidContext
+
+      safe_concat val.to_s
+    end
+
+    alias_method :safe_append=, :safe_concat
   end
 
   class ERBEngine < Erubi::Engine
@@ -22,69 +34,68 @@ module Bridgetown
       @src << ";" unless code[Erubi::RANGE_LAST] == "\n"
     end
 
+    def add_text(text)
+      return if text.empty?
+
+      src << bufvar << ".safe_append='"
+      src << text.gsub(%r{['\\]}, '\\\\\&')
+      src << "'.freeze;"
+    end
+
     # pulled from Rails' ActionView
     BLOCK_EXPR = %r!\s*((\s+|\))do|\{)(\s*\|[^|]*\|)?\s*\Z!.freeze
 
     def add_expression(indicator, code)
+      src << bufvar << if (indicator == "==") || @escape
+                         ".safe_expr_append="
+                       else
+                         ".append="
+                       end
+
       if BLOCK_EXPR.match?(code)
-        src << "#{@bufvar}.append= " << code
+        src << " " << code
       else
-        super
+        src << "(" << code << ");"
       end
     end
+  end
 
-    # Don't allow == to output escaped strings, as that's the opposite of Rails
-    def add_expression_result_escaped(code)
-      add_expression_result(code)
+  module ERBCapture
+    def capture(*args)
+      previous_buffer_state = @_erbout
+      @_erbout = OutputBuffer.new
+      result = yield(*args)
+      result = @_erbout.presence || result
+      @_erbout = previous_buffer_state
+
+      result.is_a?(String) ? ERB::Util.h(result) : result
     end
   end
 
   class ERBView < RubyTemplateView
+    include ERBCapture
+
     def h(input)
       Erubi.h(input)
     end
 
-    def partial(partial_name, options = {})
+    def partial(partial_name = nil, **options, &block)
+      partial_name = options[:template] if partial_name.nil? && options[:template]
       options.merge!(options[:locals]) if options[:locals]
-      options[:content] = yield if block_given?
+      options[:content] = capture(&block) if block
 
-      partial_segments = partial_name.split("/")
-      partial_segments.last.sub!(%r!^!, "_")
-      partial_name = partial_segments.join("/")
+      _render_partial partial_name, options
+    end
 
-      Tilt::ErubiTemplate.new(
-        site.in_source_dir(site.config[:partials_dir], "#{partial_name}.erb"),
+    def _render_partial(partial_name, options)
+      partial_path = _partial_path(partial_name, "erb")
+      tmpl = site.tmp_cache["partial-tmpl:#{partial_path}"] ||= Tilt::ErubiTemplate.new(
+        partial_path,
         outvar: "@_erbout",
-        bufval: "Bridgetown::ERBBuffer.new",
+        bufval: "Bridgetown::OutputBuffer.new",
         engine_class: ERBEngine
-      ).render(self, options)
-    end
-
-    def markdownify(input = nil, &block)
-      content = Bridgetown::Utils.reindent_for_markdown(
-        block.nil? ? input.to_s : capture(&block)
       )
-      converter = site.find_converter_instance(Bridgetown::Converters::Markdown)
-      converter.convert(content).strip
-    end
-
-    def capture(obj = nil, &block)
-      previous_buffer_state = @_erbout
-      @_erbout = ERBBuffer.new
-
-      # For compatibility with ActionView, not used by Bridgetown normally
-      previous_ob_state = @output_buffer
-      @output_buffer = ERBBuffer.new
-
-      result = instance_exec(obj, &block)
-      if @output_buffer != ""
-        # use Rails' ActionView buffer if present
-        result = @output_buffer
-      end
-      @_erbout = previous_buffer_state
-      @output_buffer = previous_ob_state
-
-      result.respond_to?(:html_safe) ? result.html_safe : result
+      tmpl.render(self, options)
     end
   end
 
@@ -96,35 +107,39 @@ module Bridgetown
       # Logic to do the ERB content conversion.
       #
       # @param content [String] Content of the file (without front matter).
-      # @params convertible [Bridgetown::Page, Bridgetown::Document, Bridgetown::Layout]
+      # @param convertible [
+      #   Bridgetown::GeneratedPage, Bridgetown::Resource::Base, Bridgetown::Layout]
       #   The instantiated object which is processing the file.
       #
       # @return [String] The converted content.
       def convert(content, convertible)
-        return content if convertible.data[:template_engine] != "erb"
+        return content if convertible.data[:template_engine].to_s != "erb"
 
         erb_view = Bridgetown::ERBView.new(convertible)
 
         erb_renderer = Tilt::ErubiTemplate.new(
-          convertible.relative_path,
+          convertible.path,
+          line_start(convertible),
           outvar: "@_erbout",
-          bufval: "Bridgetown::ERBBuffer.new",
+          bufval: "Bridgetown::OutputBuffer.new",
           engine_class: ERBEngine
         ) { content }
 
         if convertible.is_a?(Bridgetown::Layout)
           erb_renderer.render(erb_view) do
-            convertible.current_document_output
+            convertible.current_document_output.html_safe
           end
         else
           erb_renderer.render(erb_view)
         end
       end
 
+      # @param ext [String]
+      # @param convertible [Bridgetown::Resource::Base, Bridgetown::GeneratedPage]
       def matches(ext, convertible)
-        if convertible.data[:template_engine] == "erb" ||
+        if convertible.data[:template_engine].to_s == "erb" ||
             (convertible.data[:template_engine].nil? &&
-              @config[:template_engine] == "erb")
+             @config[:template_engine].to_s == "erb")
           convertible.data[:template_engine] = "erb"
           return true
         end

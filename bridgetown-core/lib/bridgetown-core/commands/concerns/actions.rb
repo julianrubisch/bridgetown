@@ -1,10 +1,5 @@
 # frozen_string_literal: true
 
-# Mostly not used here, but may come in handy in new automations
-require "active_support/core_ext/array/extract_options"
-require "active_support/core_ext/string/strip"
-require "active_support/core_ext/string/indent"
-
 module Bridgetown
   module Commands
     module Actions
@@ -30,9 +25,9 @@ module Bridgetown
         create_file("plugins/builders/#{filename}", data, verbose: false)
       end
 
-      def javascript_import(data = nil, filename: "index.js")
+      def javascript_import(data = nil, filename: "index.js") # rubocop:todo Metrics/PerceivedComplexity
         data ||= yield if block_given?
-        data += "\n" unless data.chars.last == "\n"
+        data += "\n" unless data[-1] == "\n"
 
         say_status :javascript_import, filename
 
@@ -57,21 +52,59 @@ module Bridgetown
         end
       end
 
-      def add_bridgetown_plugin(gemname, version: nil)
-        version = " -v \"#{version}\"" if version
-        run "bundle add #{gemname}#{version} -g bridgetown_plugins"
+      def add_gem(gemname, group: nil, version: nil)
+        options = +""
+        options += " -v \"#{version}\"" if version
+        options += " -g #{group}" if group
+        # in_bundle? returns the path to the gemfile
+        run "bundle add #{gemname}#{options}",
+            env: { "BUNDLE_GEMFILE" => Bundler::SharedHelpers.in_bundle? }
       rescue SystemExit
         say_status :run, "Gem not added due to bundler error", :red
+      end
+      alias_method :add_bridgetown_plugin, :add_gem
+
+      def add_initializer(name, data = "")
+        say_status :initializer, name
+        data = yield if block_given?
+        data = data.indent(2).lstrip
+        data = " #{data}" unless data.start_with?(",")
+        data += "\n" unless data[-1] == "\n"
+
+        init_file = File.join("config", "initializers.rb")
+        unless File.exist?(init_file)
+          create_file("config/initializers.rb", verbose: true) do
+            File.read(File.expand_path("../../../site_template/config/initializers.rb", __dir__))
+          end
+        end
+
+        inject_into_file init_file, %(  init :"#{name}"#{data}),
+                         before: %r!^end$!, verbose: false, force: false
+      end
+
+      def ruby_configure(name, data = "")
+        say_status :configure, name
+        data = yield if block_given?
+        data = data.indent(2)
+        data += "\n" unless data[-1] == "\n"
+
+        init_file = File.join("config", "initializers.rb")
+        unless File.exist?(init_file)
+          create_file("config/initializers.rb", verbose: true) do
+            File.read(File.expand_path("../../../site_template/config/initializers.rb", __dir__))
+          end
+        end
+
+        inject_into_file init_file, data,
+                         before: %r!^end$!, verbose: false, force: false
       end
 
       def add_yarn_for_gem(gemname)
         say_status :add_yarn, gemname
 
         Bundler.reset!
-        available_gems = Bundler.setup Bridgetown::PluginManager::PLUGINS_GROUP
-        Bridgetown::PluginManager.install_yarn_dependencies(
-          available_gems.requested_specs, gemname
-        )
+        Bridgetown::PluginManager.load_determined_bundler_environment
+        Bridgetown::PluginManager.install_yarn_dependencies(name: gemname)
       rescue SystemExit
         say_status :add_yarn, "Package not added due to yarn error", :red
       end
@@ -84,7 +117,7 @@ module Bridgetown
 
       def determine_remote_filename(arg)
         if arg.end_with?(".rb")
-          arg.split("/").yield_self do |segments|
+          arg.split("/").then do |segments|
             arg.sub!(%r!/#{segments.last}$!, "")
             segments.last
           end
@@ -102,7 +135,7 @@ module Bridgetown
         github_match = GITHUB_REGEX.match(arg)
 
         arg = if arg.start_with?("https://gist.github.com")
-                arg.sub(
+                arg.sub( # rubocop:disable Style/StringConcatenation
                   "https://gist.github.com", "https://gist.githubusercontent.com"
                 ) + "/raw"
               elsif github_match

@@ -3,7 +3,7 @@
 module Bridgetown
   # Handles the cleanup of a site's destination before it is built.
   class Cleaner
-    HIDDEN_FILE_REGEX = %r!\/\.{1,2}$!.freeze
+    HIDDEN_FILE_REGEX = %r!/\.{1,2}$!.freeze
     attr_reader :site
 
     def initialize(site)
@@ -13,7 +13,6 @@ module Bridgetown
     # Cleans up the site's destination directory
     def cleanup!
       FileUtils.rm_rf(obsolete_files)
-      FileUtils.rm_rf(metadata_file) unless @site.incremental?
     end
 
     private
@@ -26,13 +25,6 @@ module Bridgetown
       Bridgetown::Hooks.trigger :clean, :on_obsolete, out
       @new_files = @new_dirs = nil
       out
-    end
-
-    # Private: The metadata file storing dependency tree and build history
-    #
-    # Returns an Array with the metdata file as the only item
-    def metadata_file
-      [site.regenerator.metadata_file]
     end
 
     # Private: The list of existing files, apart from those included in
@@ -58,7 +50,13 @@ module Bridgetown
     # Returns a Set with the file paths
     def new_files
       @new_files ||= Set.new.tap do |files|
-        site.each_site_file { |item| files << item.destination(site.dest) }
+        site.each_site_file do |item|
+          files << if item.method(:destination).arity == 1
+                     item.destination(site.dest)
+                   else
+                     item.destination.output_path
+                   end
+        end
       end
     end
 
@@ -95,7 +93,7 @@ module Bridgetown
     #
     # Returns a Set with the directory paths
     def keep_dirs
-      site.keep_files.flat_map { |file| parent_dirs(site.in_dest_dir(file)) }.to_set
+      site.config.keep_files.flat_map { |file| parent_dirs(site.in_dest_dir(file)) }.to_set
     end
 
     # Private: Creates a regular expression from the config's keep_files array
@@ -106,7 +104,7 @@ module Bridgetown
     #
     # Returns the regular expression
     def keep_file_regex
-      %r!\A#{Regexp.quote(site.dest)}\/(#{Regexp.union(site.keep_files).source})!
+      %r!\A#{Regexp.quote(site.dest)}/(#{Regexp.union(site.config.keep_files).source})!
     end
   end
 end

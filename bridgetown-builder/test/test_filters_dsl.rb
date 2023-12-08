@@ -4,7 +4,7 @@ require "helper"
 
 class FiltersBuilder < Builder
   def build
-    liquid_filter "multiply_by_2" do |input|
+    liquid_filter :multiply_by_2 do |input|
       input * 2
     end
 
@@ -18,7 +18,14 @@ class FiltersBuilder < Builder
     end
 
     liquid_filter "site_config" do |input|
+      raise "OOPS!" if filters_context.registers[:site] && filters_context.registers[:site] != site
+
       input.to_s + " #{site.root_dir}"
+    end
+
+    liquid_filter "within_filters_scope" do |something|
+      sl = filters.slugify(something)
+      "Within Filters Scope: #{filters.site_config(sl)} #{filters.reading_time("text")}"
     end
   end
 end
@@ -26,9 +33,8 @@ end
 class TestFilterDSL < BridgetownUnitTest
   context "adding a Liquid filter" do
     setup do
-      Bridgetown.sites.clear
       @site = Site.new(site_configuration)
-      @builder = FiltersBuilder.new("FiltersDSL", @site)
+      @builder = FiltersBuilder.new("FiltersDSL", @site).build_with_callbacks
     end
 
     should "output the filter result" do
@@ -57,6 +63,12 @@ class TestFilterDSL < BridgetownUnitTest
       content = "root_dir: {{ 'is' | site_config }}"
       result = Liquid::Template.parse(content).render
       assert_equal "root_dir: is #{@site.root_dir}", result
+    end
+
+    should "allow access to filters scope" do
+      content = "Scope? {{ 'howdy howdy' | within_filters_scope }}"
+      result = Liquid::Template.parse(content).render({}, registers: { site: @site })
+      assert_equal "Scope? Within Filters Scope: howdy-howdy #{@site.root_dir} 1", result
     end
   end
 end

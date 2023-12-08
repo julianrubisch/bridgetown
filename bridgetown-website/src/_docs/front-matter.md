@@ -1,24 +1,19 @@
 ---
 title: Front Matter
-order: 12
-top_section: Content
+order: 90
+top_section: Writing Content
 category: front-matter
 ---
 
-Front matter is a snippet of [YAML](https://yaml.org/) which sits between two
-triple-dashed lines at the top of a file. You use front matter to add metadata,
-like a title or a description, to files such as pages and documents as well as site
-layouts. Front matter can be used in various ways to set configuration options
-on a per-file basis, and starting with Bridgetown v0.13, you can even write Ruby
-code for dynamic front matter variables.
+Front matter is a snippet of [YAML](https://yaml.org/) or Ruby data which sits at the top of a file between special line delimiters. You can think of front matter as a datastore consisting of one or more key-value pairs (aka a `Hash` in Ruby). You use front matter to add metadata, like a title or a description, to resources as well as site layouts. Front matter can be used in various ways to set configuration options on a per-file basis, and if you need more dynamic handling of variable data, you can write Ruby code for processing as front matter.
 
-{% rendercontent "docs/note", title: "Don't repeat yourself" %}
-If you'd like to avoid repeating your frequently used variables
-over and over, you can define [front matter defaults](/docs/configuration/front-matter-defaults) for them and only override them where necessary (or not at all). This works
-both for predefined and custom variables.
-{% endrendercontent %}
+{%@ Note do %}
+  #### Don't repeat yourself
 
-{% toc %}
+  If you'd like to avoid repeating your frequently used variables over and over, you can define [front matter defaults](/docs/content/front-matter-defaults) for them and only override them where necessary (or not at all). This works both for predefined and custom variables.
+{% end %}
+
+{{ toc }}
 
 ## Using Front Matter
 
@@ -27,8 +22,8 @@ Bridgetown. Files without front matter are considered [static files](/docs/stati
 and are copied verbatim from the source folder to destination during the build
 process.
 
-The front matter must be the first thing in the file and must take the form of valid
-YAML set between triple-dashed lines. Here is a basic example:
+The front matter must be the first thing in the file and must either take the form of valid
+YAML set between triple-dashed lines, or one of several Ruby-based formats (more on that below). Here is a basic example:
 
 ```yaml
 ---
@@ -39,20 +34,19 @@ title: Blogging Like a Hacker
 
 Between these triple-dashed lines, you can set predefined variables (see below
 for a reference) or add custom variables of your own. These variables will
-then be available to you to access using Liquid tags both further down in the
-file and also in any layouts or components that the file in question relies on.
+then be available to you to access using Liquid or Ruby-based template code further down in the
+file, as well as in any layouts or components that the file in question relies on.
 
-{% rendercontent "docs/note", title: "Front matter variables are optional" %}
-  If you want to use [Liquid tags and variables](/docs/variables/)
-  but don’t need anything in your front matter, just leave it empty! The set
-  of triple-dashed lines with nothing in between will still get Bridgetown to
-  process your file. (This is useful for things like RSS feeds.)
-{% endrendercontent %}
+{%@ Note do %}
+  #### Front matter variables are optional
+
+  If you want to use template code in a file but don’t need anything in your front matter, just leave it empty! The set of triple-dashed lines with nothing in between will still get Bridgetown to process your file. (This is useful for things like RSS feeds.)
+{% end %}
 
 ## Predefined Global Variables
 
 There are a number of predefined global variables that you can set in the
-front matter of a page or document.
+front matter of a resource.
 
 <table class="settings biggest-output">
   <thead>
@@ -77,8 +71,8 @@ front matter of a page or document.
         <ul>
           <li>
             Using <code>null</code> will produce a file without using a layout
-            file. This is overridden if the file is a document and has a
-            layout defined in the <a href="{{ '/docs/configuration/front-matter-defaults/' | relative_url }}">
+            file. This is overridden if the file is a resource and has a
+            layout defined in the <a href="/docs/content/front-matter-defaults">
             front matter defaults</a>.
           </li>
           <li>
@@ -106,7 +100,7 @@ front matter of a page or document.
         <p>
 
           If you need your URLs to be something other than what is configured by default,
-          (for posts, the default is <code>/category/year/month/day/title.html</code>),
+          (for posts, the default is <code>/category/year/month/day/title/</code>),
           then you can set this variable and it will be used as the final URL.
         </p>
       </td>
@@ -125,10 +119,11 @@ front matter of a page or document.
   </tbody>
 </table>
 
-{% rendercontent "docs/note", title: "Render pages marked as unpublished" %}
-  To preview unpublished pages, run `bridgetown serve` or `bridgetown build` with
+{%@ Note do %}
+  #### Render pages marked as unpublished
+  To preview unpublished pages, run `bridgetown start` or `bridgetown build` with
   the `--unpublished` switch.
-{% endrendercontent %}
+{% end %}
 
 ## Custom Variables
 
@@ -141,27 +136,31 @@ instance, if you set a variable called `food`, you can use that in your page:
 food: Pizza
 ---
 
-<h1>{{ page.food }}</h1>
+<h1>{{ resource.data.food }}</h1>
 ```
 {% endraw %}
 
-Or if you're using the ERB template engine:
+Ruby templates (ERB, etc.) work the same way:
 
 ```eruby
 ---
 food: Pad Thai
 ---
 
-<h1><%= page.data[:food] %></h1>
+<h1><%= resource.data.food %></h1>
 ```
 
-You can also use a document's front matter variables in other places like layouts, and
-you can even reference those variables in loops through documents or as part of more
-complex queries (see [Liquid filters](/docs/liquid/filters/) for more information).
+You can also use a resource's front matter variables in other places like layouts, and
+you can even reference those variables in loops or as part of more
+complex queries (see the [Liquid](/docs/template-engines/liquid) or [ERB and Beyond](/docs/template-engines/erb-and-beyond) docs for more information).
 
-## Predefined Variables for Posts
+{%@Note do %}
+Starting in Bridgetown 1.2, you can use the shorthand `data` method to access resource data in a template. For example: `data.food` instead of `resource.data.food`, `data.slug` instead of `resource.data.slug`, etc. Note that you'll still need to use the `resource` object directly for predefined methods such as `resource.relative_url`, `resource.summary`, and some others.
+{% end %}
 
-For documents in the `posts` collection, these variables are available out-of-the-box:
+## Predefined Variables
+
+These resource variables are available out-of-the-box:
 
 <table class="settings biggest-output">
   <thead>
@@ -177,10 +176,10 @@ For documents in the `posts` collection, these variables are available out-of-th
       </td>
       <td>
         <p>
-          Specifying a date variable overrides the date from the filename of the post.
+          Specifying a date variable overrides the date from the filename of the resource.
           This can be used to ensure correct sorting of posts. A date is specified in the
           format <code>YYYY-MM-DD HH:MM:SS +/-TTTT</code>; hours, minutes, seconds, and
-          timezone offset are optional.
+          timezone offset are optional. You can also use a more human-readable format like this: <code>Wed, 02 Feb 2022 08:55:41 -0800</code>.
         </p>
       </td>
     </tr>
@@ -191,8 +190,7 @@ For documents in the `posts` collection, these variables are available out-of-th
       </td>
       <td>
         <p>
-
-          You can specify one or more categories that the post belongs to, and then you can
+          You can specify one or more categories that the resource belongs to, and then you can
           use that to filter posts in various ways or use the "slugified" version of the
           category name to adjust the permalink for a post. Categories (plural key) can be
           specified as a <a
@@ -207,8 +205,8 @@ For documents in the `posts` collection, these variables are available out-of-th
       </td>
       <td>
         <p>
-          Similar to categories, one or multiple tags can be added to a post as a flexible
-          method of building a lightweight content <a href="https://en.wikipedia.org/wiki/Taxonomy" rel="noopener">taxonomy</a>.
+          Similar to categories, one or multiple tags can be added to a resource as a flexible
+          method of building a content <a href="https://en.wikipedia.org/wiki/Folksonomy" rel="noopener">folksonomy</a>.
           As with categories, tags can be specified as a <a
           href="https://en.wikipedia.org/wiki/YAML#Basic_components" rel="noopener">YAML list</a> or a
           space-separated string.
@@ -233,49 +231,86 @@ description: |
 
 For reference, [here's a side-by-side comparison](https://yaml.org/YAML_for_ruby.html) of YAML data structures and their equivalents in Ruby.
 
-{% rendercontent "docs/note", type: "warning", title: "UTF-8 Character Encoding Warning" %}
-If you use UTF-8 encoding, make sure that no `BOM` header characters exist in your files or
-you may encounter build errors.
-{% endrendercontent %}
+{%@ Note type: "warning" do %}
+  #### UTF-8 Character Encoding Warning
 
-## Ruby Front Matter
+  If you use UTF-8 encoding, make sure that no `BOM` header characters exist in your files or you may encounter build errors.
+{% end %}
 
-For advanced use cases where you wish to generate dynamic values for front matter variables, you can use Ruby Front Matter (new in Bridgetown v0.13). This feature is available for pages, posts, and other documents–as well as layouts for site-wide access to your Ruby return values.
+## The Power of Ruby, in Front Matter
 
-{% rendercontent "docs/note" %}
-Prior to v0.17, this required the environment variable `BRIDGETOWN_RUBY_IN_FRONT_MATTER` to be set to `"true"`, otherwise the code would not be executed and would be treated as a raw string.
-{% endrendercontent %}
+For advanced use cases where you wish to generate dynamic values for front matter variables, you can use Ruby Front Matter (hereafter named rbfm).
 
-[Here's a blog post with a high-level overview](/feature/supercharge-your-bridgetown-site-with-ruby-front-matter/){:data-no-swup="true"} of what Ruby Front Matter is capable of and why you might want to use it.
+Any valid Ruby code is allowed in rbfm as long as it returns a `Hash`—or an object which `respond_to?(:to_h)`. There are several different ways you can define rbfm at the top of your file. This is so syntax highlighting will work in various different template scenarios.
 
-To write Ruby code in your front matter, use the special tagged string `!ruby/string:Rb`. Here is an example:
+For Markdown files, you can use backticks or tildes plus the term `ruby` to take advantage of GFM (GitHub-flavored Markdown) syntax highlighting.
 
-{% raw %}
-```liquid
----
-title: I'm a page
-permalink: /ruby-demo
-calculation: !ruby/string:Rb |
-  [2 * 4, 5 + 2].min
----
-
-Title: {{ page.title }}
-Calc Result: {{ page.calculation }}
+~~~md
+```ruby
+{
+  layout: :page,
+  title: "About"
+}
 ```
-{% endraw %}
 
-In the final page output rendered by Liquid, the value of the `calculation` variable will be the return value of the Ruby code.
+I'm a **Markdown** file.
+~~~
 
-You can write any Ruby code into a front matter variable. However, if you need to write a lengthy block of code, or write code that is easily customizable or reusable in multiple contexts, [we still recommended you write a Bridgetown plugin](/docs/plugins/)—either in the `plugins` folder in your site repo or as a separate Gem-based plugin.
+or
 
-Depending on if your Ruby code is added to a document or a layout, certain Ruby objects are provided for your use.
+```md
+~~~ruby
+{
+  layout: :page,
+  title: "About"
+}
+~~~
 
-For **layouts**, you can access: `site`, `layout`, and `data`.
+I'm a **Markdown** file.
+```
 
-For **documents**, you can access: `site`, `page` or `document` (they are equivalent), `renderer`, and `data`.
+For ERB or Serbea files, you can use `---<%` / `%>---` or {% raw %}`---{%` / `%}---`{% endraw %} delimiters respectively. (You can substitute `~` instead of `-` if you prefer.)
 
-Documentation on the internal Ruby API for Bridgetown is forthcoming, but meanwhile the easiest way to debug the code you write is to run `bridgetown console` and interact with the API there, then copy working code into your Ruby Front Matter.
+For all-Ruby files, you can use `---ruby` / `---` or `###ruby` / `###` delimiters.
 
-{% rendercontent "docs/note", type: "warning" %}
+However you define your rbfm, bear in mind that the front matter code is executed _prior_ to any processing of the template file itself and within a different context. (rbfm will be executed initially within either `Bridgetown::Model::RepoOrigin` or `Bridgetown::Layout`.)
+
+Thankfully, there is a solution for when you want a front matter variable resolved within the execution context of a resource (aka `Bridgetown::Resource::Base`): use a lambda. Any lambda (or proc in general) will be resolved at the time a resource has been fully initialized. A good use case for this would be to define a custom permalink based on other front matter variables. For example:
+
+```md
+~~~ruby
+{
+  layout: :page,
+  segments: ["custom", "permalink"],
+  title: "About Us",
+  permalink: -> { "#{data.segments.join("/")}/#{Bridgetown::Utils.slugify(data.title)}" }
+}
+~~~
+
+This will now show up for the path: /custom/permalink/about-us
+```
+
+Besides using a simple `Hash`, you can also use the handy `front_matter` <abbr title="Domain-Specific Language">DSL</abbr>. Any valid method call made directly in the block will translate to a front matter key. Let's rewrite the above example:
+
+```md
+~~~ruby
+front_matter do
+  layout :page
+
+  url_segments = ["custom"]
+  url_segments << "permalink"
+  segments url_segments
+
+  title "About Us"
+  permalink -> { "#{data.segments.join("/")}/#{Bridgetown::Utils.slugify(data.title)}" }
+end
+~~~
+
+This will now show up for the path: /custom/permalink/about-us
+```
+
+As you can see, literally any valid Ruby code has the potential to be transformed into front matter. The sky's the limit!
+
+{%@ Note type: "warning" do %}
 For security reasons, please _do not allow_ untrusted content into your repository to be executed in an unsafe environment (aka outside of a Docker container or similar). Just like with custom plugins, a malicious content contributor could potentially introduce harmful code into your site and thus any computer system used to build that site. Enable Ruby Front Matter _only_ if you feel confident in your ability to control and monitor all on-going updates to repository files and data.
-{% endrendercontent %}
+{% end %}

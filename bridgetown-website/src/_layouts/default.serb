@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    {%@ "head" %}
+  </head>
+  <body class="{{ data.layout }} {{ data.page_class }}">
+    <skip-to-main-content-bar>
+      <a href="#main">Skip to main content</a>
+    </skip-to-main-content-bar>
+
+    <theme-picker></theme-picker>
+
+    {%@ Shared::Navbar metadata: site.metadata, resource: resource %}
+
+    <main id="main">
+      {%= yield %}
+    </main>
+
+    {%@ "footer", metadata: site.metadata %}
+  </body>
+</html>

@@ -5,7 +5,7 @@ require "helper"
 class MethodSymbolsBuilder < Builder
   def build
     generator :set_title
-    liquid_tag "upcase_tag", :upcase_tag, as_block: true
+    liquid_tag :upcase_tag, as_block: true
     liquid_filter "multiply_by_anything", :multiply_filter
     hook :site, :after_reset, :reset_hook
   end
@@ -35,14 +35,14 @@ end
 class TestMethodSymbols < BridgetownUnitTest
   context "adding tags, filters, generators, and hooks using method symbols" do
     setup do
-      Bridgetown.sites.clear
       @site = Site.new(site_configuration)
-      @builder = MethodSymbolsBuilder.new("MethodSymbols", @site)
+      @builder = MethodSymbolsBuilder.new("MethodSymbols", @site).build_with_callbacks
     end
 
     should "load generator on site generate" do
       @site.reset
       @site.data[:site_metadata] = { title: "Initial Value in Method Symbols" }
+      @site.loaders_manager.unload_loaders
       @site.setup
 
       assert_equal "Initial Value in Method Symbols", @site.metadata[:title]

@@ -26,6 +26,7 @@ module Bridgetown
 
       def apply_automation
         @source_paths = [Dir.pwd]
+        @logger = Bridgetown.logger
 
         if options[:apply]
           apply_after_new_command
@@ -33,9 +34,9 @@ module Bridgetown
           apply_in_pwd
         end
       rescue SystemExit => e
-        Bridgetown.logger.error "Problem occurred while running automation:"
+        @logger.error "Problem occurred while running automation:"
         e.backtrace[0..3].each do |backtrace_line|
-          Bridgetown.logger.info backtrace_line if backtrace_line.include?(":in `apply'")
+          @logger.info backtrace_line if backtrace_line.include?(":in `apply'")
         end
         raise e
       end
@@ -57,16 +58,16 @@ module Bridgetown
         automation_command = args.empty? ? "bridgetown.automation.rb" : args[0]
 
         if args.empty? && !File.exist?("bridgetown.automation.rb")
-          raise ArgumentError, "You must specify a path or a URL," \
-                               " or add bridgetown.automation.rb to the" \
-                               " current folder."
+          raise ArgumentError, "You must specify a path or a URL, " \
+                               "or add bridgetown.automation.rb to the " \
+                               "current folder."
         end
 
         Bridgetown.with_unbundled_env do
           apply_from_url automation_command
         end
       rescue ArgumentError => e
-        Bridgetown.logger.warn "Oops!", e.message
+        @logger.warn "Oops!", e.message
       end
     end
   end

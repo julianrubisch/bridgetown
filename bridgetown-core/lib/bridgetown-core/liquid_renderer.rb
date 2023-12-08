@@ -15,7 +15,7 @@ module Bridgetown
 
       # Set up Liquid file system access to components for the Render tag
       Liquid::Template.file_system = LiquidRenderer::FileSystem.new(
-        @site.components_load_paths, "%s.liquid"
+        @site.config.components_load_paths, "%s.liquid"
       )
       Liquid::Template.file_system.site = site
 
@@ -68,9 +68,7 @@ module Bridgetown
     private
 
     def filename_regex
-      @filename_regex ||= begin
-        %r!\A(#{Regexp.escape(source_dir)}/|/*)(.*)!i
-      end
+      @filename_regex ||= %r!\A(#{Regexp.escape(source_dir)}/|/*)(.*)!i
     end
 
     def new_profile_hash

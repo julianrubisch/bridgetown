@@ -11,7 +11,7 @@ class TestRubyHelpers < BridgetownUnitTest
 
   context "link_to" do
     should "return post's relative URL" do
-      assert_equal "<a href=\"/publish-test/2008/02/02/published.html\">Label</a>", @helpers.link_to("Label", "_posts/2008-02-02-published.markdown")
+      assert_equal "<a href=\"/publish_test/2008/02/02/published/\">Label</a>", @helpers.link_to("Label", "_posts/2008-02-02-published.markdown")
     end
 
     should "throw error if post doesn't exist" do
@@ -21,7 +21,7 @@ class TestRubyHelpers < BridgetownUnitTest
     end
 
     should "return accept objects which respond to url" do
-      assert_equal "<a href=\"/2020/09/10/further-nested.html\">Label</a>", @helpers.link_to("Label", @site.posts.docs.last)
+      assert_equal "<a href=\"/2020/09/10/further-nested/\">Label</a>", @helpers.link_to("Label", @site.collections.posts.resources.first)
     end
 
     should "pass through relative/absolute URLs" do
@@ -31,6 +31,43 @@ class TestRubyHelpers < BridgetownUnitTest
 
     should "accept additional attributes" do
       assert_equal "<a href=\"/foo/bar\" class=\"classes\" data-test=\"abc123\">Label</a>", @helpers.link_to("Label", "/foo/bar", class: "classes", data_test: "abc123")
+      assert_equal "<a href=\"/foo/bar\" class=\"classes\" data-test=\"abc123\">Label</a>", @helpers.link_to("/foo/bar", class: "classes", data_test: "abc123") { "Label" }
+    end
+
+    should "accept hash attributes" do
+      assert_equal "<a href=\"/foo/bar\" class=\"classes\" data-controller=\"test\" data-action=\"test#test\">Label</a>", @helpers.link_to("Label", "/foo/bar", class: "classes", data: { controller: "test", action: "test#test" })
+    end
+
+    should "accept anchors" do
+      assert_equal "<a href=\"#foo\">Label</a>", @helpers.link_to("Label", "#foo")
+    end
+
+    should "accept email links" do
+      assert_equal "<a href=\"mailto:a@example.org\">Label</a>", @helpers.link_to("Label", "mailto:a@example.org")
+    end
+
+    should "accept telephone links" do
+      assert_equal "<a href=\"tel:01234\">Label</a>", @helpers.link_to("Label", "tel:01234")
+    end
+
+    should "accept block syntax" do
+      assert_equal "<a href=\"/foo/bar\">Label</a>", @helpers.link_to("/foo/bar") { "Label" }
+    end
+
+    should "raise if only one argument was given" do
+      assert_raises ArgumentError do
+        @helpers.link_to("Label")
+      end
+    end
+  end
+
+  context "attributes_from_options" do
+    should "return an attribute string from a hash" do
+      assert_equal "class=\"classes\" data-test=\"abc123\"", @helpers.attributes_from_options(class: "classes", data_test: "abc123")
+    end
+
+    should "handle nested hashes" do
+      assert_equal "class=\"classes\" data-controller=\"test\" data-action=\"test#test\" data-test-target=\"test_value\" data-test-index-value=\"1\"", @helpers.attributes_from_options(class: "classes", data: { controller: "test", action: "test#test", test: { target: "test_value", index_value: "1" } })
     end
   end
 

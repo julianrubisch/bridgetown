@@ -101,7 +101,7 @@ class TestStaticFile < BridgetownUnitTest
              "static_file.write? should return true by default")
     end
 
-    should "use the _config.yml defaults to determine writability" do
+    should "use the config defaults to determine writability" do
       defaults = [{
         "scope"  => { "path" => "private" },
         "values" => { "published" => false },
@@ -113,7 +113,7 @@ class TestStaticFile < BridgetownUnitTest
         defaults
       )
       assert(!static_file.write?,
-             "static_file.write? should return false when _config.yml sets " \
+             "static_file.write? should return false when config sets " \
              "`published: false`")
     end
 
@@ -176,9 +176,11 @@ class TestStaticFile < BridgetownUnitTest
         "basename"      => "static_file",
         "name"          => "static_file.txt",
         "extname"       => ".txt",
+        "date"          => @static_file.date,
         "modified_time" => @static_file.modified_time,
         "path"          => "/static_file.txt",
         "collection"    => nil,
+        "permalink"     => "/:path.*",
       }
       assert_equal expected, @static_file.to_liquid.to_h
     end

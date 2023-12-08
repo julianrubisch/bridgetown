@@ -1,38 +1,42 @@
 ---
 title: Data Files
-order: 14
-top_section: Content
-category: datafiles
+order: 120
+top_section: Writing Content
+category: data-files
 ---
 
-In addition to the [built-in variables]({{'/docs/variables/' | relative_url }}) available from Bridgetown,
-you can specify your own custom data that can be accessed via Liquid.
+In addition to standard [resources](/docs/resources), you can specify custom datasets which are accessible via Liquid and Ruby templates as well as plugins.
 
-Bridgetown supports loading data from [YAML](http://yaml.org/), [JSON](http://www.json.org/), [CSV](https://en.wikipedia.org/wiki/Comma-separated_values), and [TSV](https://en.wikipedia.org/wiki/Tab-separated_values) files located in the `_data` folder.
-Note that CSV and TSV files *must* contain a header row.
+Bridgetown supports loading data from [YAML](http://yaml.org/), [JSON](http://www.json.org/), [CSV](https://en.wikipedia.org/wiki/Comma-separated_values), and [TSV](https://en.wikipedia.org/wiki/Tab-separated_values) files located in the `src/_data` folder. Note that CSV and TSV files *must* contain a header row.
 
-This powerful feature allows you to avoid repetition in your templates and to
-set site specific options without changing `bridgetown.config.yml`.
+You can also save standard Ruby files (`.rb`) to `_data` which get automatically evaluated. The return value at the end of the file can either be an array or any object which responds to `to_h` (and thus returns a `Hash`).
 
-{% toc %}
+This powerful feature allows you to avoid repetition in your templates and set site-specific options without changing `bridgetown.config.yml`—and in the case of Ruby data files, perform powerful processing tasks to populate your site content.
+
+{{ toc }}
 
 ## The Data Folder
 
-The `_data` folder is where you can store additional data for Bridgetown to use when
-generating your site. These files must be YAML, JSON, or CSV files (using either
-the `.yml`, `.yaml`, `.json` or `.csv` extension), and they will be
-accessible via `site.data`.
+The `_data` folder is where you can save YAML, JSON, or CSV files (using either the `.yml`, `.yaml`, `.json` or `.csv` extension), and they will be accessible via `site.data`. Also, any files ending in `.rb` within the data folder will be evaluated as Ruby code with a Hash formatted output.
 
 ## The Metadata File
 
-You can store site-wide metadata variables in `_data/site_metadata.yml` so
-they'll be easy to access and will regenerate pages when changed. This is a good
-place to put `<head>` content like your website title, description, favicon, social media handles, etc. Then you can reference {{ site.metadata.title }}, etc. in your Liquid templates.
+You can store site-wide metadata variables in `_data/site_metadata.yml` so they'll be easy to access and will regenerate pages when changed. This is a good place to put `<head>` content like your website title, description, favicon, social media handles, etc. Then you can reference `site.metadata.title`, etc. in your Liquid and Ruby templates.
 
-## Example: List of members
+Want to switch to using a `site_metadata.rb` file where you have more programmatic control over the data values, can easily load in `ENV` variable, etc.? Now you can! For example:
 
-Here is a basic example of using Data Files to avoid copy-pasting large chunks
-of code in your Bridgetown templates:
+```ruby
+# src/_data/site_metadata.rb
+{
+  title: "Your Ruby Website",
+  lang: ENV["LANG"],
+  tagline: "All we need is Ruby"
+}
+```
+
+## Example: Define a List of members
+
+Here is a basic example of using data files to avoid copy-pasting large chunks of code in your Bridgetown templates:
 
 In `_data/members.yml`:
 
@@ -56,8 +60,7 @@ Parker Moore,parkr
 Liu Fengyun,liufengyun
 ```
 
-This data can be accessed via `site.data.members` (notice that the filename
-determines the variable name).
+This data can be accessed via `site.data.members` (notice that the filename determines the variable name).
 
 You can now render the list of members in a template:
 
@@ -77,10 +80,7 @@ You can now render the list of members in a template:
 
 ## Subfolders
 
-Data files can also be placed in subfolders of the `_data` folder. Each folder
-level will be added to a variable's namespace. The example below shows how
-GitHub organizations could be defined separately in a file under the `orgs`
-folder:
+Data files can also be placed in subfolders of the `_data` folder. Each folder level will be added to a variable's namespace. The example below shows how GitHub organizations could be defined separately in a file under the `orgs` folder:
 
 In `_data/orgs/bridgetownrb.yml`:
 
@@ -105,14 +105,13 @@ members:
     github: jdoe
 ```
 
-The organizations can then be accessed via `site.data.orgs`, followed by the
-file name:
+The organizations can then be accessed via `site.data.orgs`, followed by the file name:
 
 {% raw %}
 ```liquid
 <ul>
 {% for org_hash in site.data.orgs %}
-{% assign org = org_hash[1] %}
+  {% assign org = org_hash[1] %}
   <li>
     <a href="https://github.com/{{ org.username }}" rel="noopener">
       {{ org.name }}
@@ -124,9 +123,24 @@ file name:
 ```
 {% endraw %}
 
-## Example: Accessing a specific author
+## Merging Site Data into Resource Data
 
-Pages and posts can also access a specific data item. The example below shows how to access a specific item:
+New for Bridgetown 1.2: for easier access to data in your templates whether that data comes from the resource directly or from data files, you can use [front matter](/docs/front-matter/) to specify a data path for merging into the resource.
+
+Just define a front matter variable in a resource like so:
+
+```yaml
+---
+title: Projects
+projects: site.data.projects
+---
+```
+
+Now in your template you can reference `data.projects` just like you might `data.title` or any other front matter variable. You can even use [front matter defaults](/docs/content/front-matter-defaults/) to assign such a data variable to multiple resources at once.
+
+### Example: Accessing a Specific Author
+
+You can access a specific data item from a dataset using a front matter variable. The example below shows how. First, define your dataset:
 
 `_data/people.yml`:
 
@@ -136,20 +150,20 @@ dave:
   twitter: DavidSilvaSmith
 ```
 
-The author can then be specified as a page variable in a post's front matter:
+That author can then be specified as a variable in a post's front matter:
 
 {% raw %}
 ```liquid
 ---
-title: sample post
+title: Sample Post
 author: dave
+people: site.data.people
 ---
 
-{% assign author = site.data.people[page.author] %}
-<a rel="author noopener"
-  href="https://twitter.com/{{ author.twitter }}"
-  title="{{ author.name }}">
-    {{ author.name }}
+{% assign author = data.people[data.author] %}
+
+<a rel="author" href="https://twitter.com/{{ author.twitter }}">
+  {{ author.name }}
 </a>
 ```
 {% endraw %}

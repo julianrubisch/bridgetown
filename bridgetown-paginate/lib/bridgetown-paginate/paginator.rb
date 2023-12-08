@@ -28,22 +28,18 @@ module Bridgetown
         @total_pages = num_pages
 
         if @page > @total_pages
-          raise "page number can't be greater than total pages:" \
-            " #{@page} > #{@total_pages}"
+          raise "page number can't be greater than total pages: " \
+                "#{@page} > #{@total_pages}"
         end
 
         init = (@page - 1) * @per_page
-        offset = if init + @per_page - 1 >= documents.size
-                   documents.size
-                 else
-                   init + @per_page - 1
-                 end
+        offset = [init + @per_page - 1, documents.size].min
 
         # Ensure that the current page has correct extensions if needed
         this_page_url = Utils.ensure_full_path(
           @page == 1 ? first_index_page_url : paginated_page_url,
-          !default_indexpage || default_indexpage.empty? ? "index" : default_indexpage,
-          !default_ext || default_ext.empty? ? ".html" : default_ext
+          default_indexpage || "",
+          default_ext || ""
         )
 
         # To support customizable pagination pages we attempt to explicitly
@@ -63,7 +59,7 @@ module Bridgetown
         @documents = documents[init..offset]
         @page_path = Utils.format_page_number(this_page_url, cur_page_nr, @total_pages)
 
-        @previous_page = @page != 1 ? @page - 1 : nil
+        @previous_page = @page == 1 ? nil : @page - 1
         @previous_page_path = unless @page == 1
                                 if @page == 2
                                   Utils.format_page_number(
@@ -77,7 +73,7 @@ module Bridgetown
                                   )
                                 end
                               end
-        @next_page = @page != @total_pages ? @page + 1 : nil
+        @next_page = @page == @total_pages ? nil : @page + 1
         @next_page_path = if @page != @total_pages
                             Utils.format_page_number(
                               paginated_page_url, @next_page, @total_pages
@@ -90,6 +86,15 @@ module Bridgetown
         @last_page_path = Utils.format_page_number(paginated_page_url, @total_pages, @total_pages)
       end
 
+      # TODO: eventually deprecate documents and only have resources
+      def resources
+        documents
+      end
+
+      def total_resources
+        total_documents
+      end
+
       # Convert this Paginator's data to a Hash suitable for use by Liquid.
       #
       # Returns the Hash representation of this Paginator.
@@ -97,7 +102,9 @@ module Bridgetown
         {
           "per_page"           => per_page,
           "documents"          => documents,
+          "resources"          => documents,
           "total_documents"    => total_documents,
+          "total_resources"    => total_resources,
           "total_pages"        => total_pages,
           "page"               => page,
           "page_path"          => page_path,

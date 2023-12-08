@@ -3,13 +3,14 @@
 class Bridgetown::Site
   module Extensible
     # Load necessary libraries, plugins, converters, and generators.
+    # This is only ever run once for the lifecycle of the site object.
     # @see Converter
     # @see Generator
     # @see PluginManager
     # @return [void]
     def setup
       plugin_manager.require_plugin_files
-      plugin_manager.setup_component_loaders
+      loaders_manager.setup_loaders
       self.converters = instantiate_subclasses(Bridgetown::Converter)
       self.generators = instantiate_subclasses(Bridgetown::Generator)
     end
@@ -40,10 +41,9 @@ class Bridgetown::Site
     #   instance implementing the given `Converter` class.
     def find_converter_instance(klass)
       @find_converter_instance ||= {}
-      @find_converter_instance[klass] ||= begin
-        converters.find { |converter| converter.instance_of?(klass) } || \
-          raise("No Converters found for #{klass}")
-      end
+      @find_converter_instance[klass] ||= converters.find do |converter|
+        converter.instance_of?(klass)
+      end || raise("No Converters found for #{klass}")
     end
 
     # Create an array of instances of the subclasses of the class
@@ -55,6 +55,14 @@ class Bridgetown::Site
       klass.descendants.sort.map do |c|
         c.new(config)
       end
+    end
+
+    # Shorthand for registering a site hook via {Bridgetown::Hooks}
+    # @param event [Symbol] name of the event (`:pre_read`, `:post_render`, etc.)
+    # @yield the block will be called when the event is triggered
+    # @yieldparam site the site which triggered the event hook
+    def on(event, reloadable: false, &block)
+      Bridgetown::Hooks.register_one :site, event, reloadable: reloadable, &block
     end
   end
 end

@@ -12,7 +12,7 @@ module Bridgetown
       @logging_lambda = nil
       # The lambda used to create pages and add them to the site
       @page_add_lambda = nil
-      # Lambda to remove a page from the site.pages collection
+      # Lambda to remove a page
       @page_remove_lambda = nil
       # Lambda to get all documents/posts in a particular collection (by name)
       @collection_by_name_lambda = nil
@@ -32,8 +32,11 @@ module Bridgetown
       # rubocop:disable Metrics/BlockLength
       def run(default_config, templates, site_title) # rubocop:todo Metrics/AbcSize
         if templates.size.to_i <= 0
-          @logging_lambda.call "is enabled in the config, but no paginated pages found." \
-            " Add 'pagination:\\n  enabled: true' to the front-matter of a page.", "warn"
+          @logging_lambda.call(
+            "is enabled in the config, but no paginated pages found. " \
+            "Add 'pagination:\\n  collection: <label>' to the front-matter of a page.",
+            "warn"
+          )
           return
         end
 
@@ -43,66 +46,73 @@ module Bridgetown
         templates.each do |template|
           # All pages that should be paginated need to include the pagination
           # config element
-          if template.data["pagination"].is_a?(Hash)
-            template_config = Bridgetown::Utils.deep_merge_hashes(
-              default_config,
-              template.data["pagination"] || {}
-            )
-
-            # Is debugging enabled on the page level
-            @debug = template_config["debug"]
-
-            _debug_print_config_info(template_config, template.path)
-
-            # Only paginate the template if it is explicitly enabled
-            # requiring this makes the logic simpler as I don't need to
-            # determine which index pages were generated automatically and
-            # which weren't
-            if template_config["enabled"]
-              @logging_lambda.call "found page: " + template.path, "debug" unless @debug
-
-              # Request all documents in all collections that the user has requested
-              all_posts = get_docs_in_collections(template_config["collection"])
-
-              # Create the necessary indexes for the posts
-              all_categories = if template_config["category"]
-                                 PaginationIndexer.index_documents_by(all_posts, "categories")
-                               end
-              all_tags = if template_config["tag"]
-                           PaginationIndexer.index_documents_by(all_posts, "tags")
-                         end
-              all_locales = if template_config["locale"]
-                              PaginationIndexer.index_documents_by(all_posts, "locale")
-                            end
-
-              # Load in custom query index, if specified
-              all_where_matches = if template_config["where_query"]
-                                    PaginationIndexer.index_documents_by(
-                                      all_posts, template_config["where_query"]
-                                    )
-                                  end
-
-              documents_payload = {
-                posts: all_posts,
-                tags: all_tags,
-                categories: all_categories,
-                locales: all_locales,
-                where_matches: all_where_matches,
-              }
-
-              # TODO: NOTE!!! This whole request for posts and indexing results
-              # could be cached to improve performance, leaving like this for
-              # now during testing
-
-              # Now construct the pagination data for this template page
-              paginate(
-                template,
-                template_config,
-                site_title,
-                documents_payload
-              )
-            end
+          unless template.data["pagination"].is_a?(Hash) || template.data["paginate"].is_a?(Hash)
+            next
           end
+
+          template_config = Bridgetown::Utils.deep_merge_hashes(
+            default_config,
+            template.data["pagination"] || template.data["paginate"] || {}
+          ).tap do |config|
+            config["collection"] = config["collection"].to_s if config["collection"].is_a?(Symbol)
+            config["category"] = config["category"].to_s if config["category"].is_a?(Symbol)
+            config["tag"] = config["tag"].to_s if config["tag"].is_a?(Symbol)
+            config["locale"] = config["locale"].to_s if config["locale"].is_a?(Symbol)
+          end
+
+          # Is debugging enabled on the page level
+          @debug = template_config["debug"]
+          _debug_print_config_info(template_config, template.path)
+
+          next unless template_config["enabled"]
+
+          if template.site.config.available_locales.size > 1 && !template_config["locale"]
+            template_config["locale"] =
+              template.data["locale"].to_s
+          end
+
+          @logging_lambda.call "found page: #{template.path}", "debug" unless @debug
+
+          # Request all documents in all collections that the user has requested
+          all_posts = get_docs_in_collections(template_config["collection"], template)
+
+          # Create the necessary indexes for the posts
+          all_categories = if template_config["category"]
+                             PaginationIndexer.index_documents_by(all_posts, "categories")
+                           end
+          all_tags = if template_config["tag"]
+                       PaginationIndexer.index_documents_by(all_posts, "tags")
+                     end
+          all_locales = if template_config["locale"]
+                          PaginationIndexer.index_documents_by(all_posts, "locale")
+                        end
+
+          # Load in custom query index, if specified
+          all_where_matches = if template_config["where_query"]
+                                PaginationIndexer.index_documents_by(
+                                  all_posts, template_config["where_query"]
+                                )
+                              end
+
+          documents_payload = {
+            posts: all_posts,
+            tags: all_tags,
+            categories: all_categories,
+            locales: all_locales,
+            where_matches: all_where_matches,
+          }
+
+          # TODO: NOTE!!! This whole request for posts and indexing results
+          # could be cached to improve performance, leaving like this for
+          # now during testing
+
+          # Now construct the pagination data for this template page
+          paginate(
+            template,
+            template_config,
+            site_title,
+            documents_payload
+          )
         end
 
         # Return the total number of templates found
@@ -114,7 +124,13 @@ module Bridgetown
       # specified
       # raw_collection_names can either be a list of collections separated by a
       # ',' or ' ' or a single string
-      def get_docs_in_collections(raw_collection_names)
+      def get_docs_in_collections(raw_collection_names, template)
+        if raw_collection_names.blank?
+          @logging_lambda.call "Missing collection name for paginated page: " \
+                               "#{template.relative_path}"
+          return []
+        end
+
         if @docs_by_collection_cache[raw_collection_names]
           return @docs_by_collection_cache[raw_collection_names]
         end
@@ -134,7 +150,7 @@ module Bridgetown
         end
 
         # Hidden documents should not not be processed anywhere.
-        docs = docs.reject { |doc| doc["hidden"] }
+        docs = docs.reject { |doc| doc.data.exclude_from_pagination }
 
         @docs_by_collection_cache[raw_collection_names] = docs
 
@@ -146,34 +162,34 @@ module Bridgetown
         r = 20
         f = "Pagination: ".rjust(20)
         # Debug print the config
-        if @debug
-          puts f + "----------------------------"
-          puts f + "Page: " + page_path.to_s
-          puts f + " Active configuration"
-          puts f + "  Enabled: ".ljust(r) + config["enabled"].to_s
-          puts f + "  Items per page: ".ljust(r) + config["per_page"].to_s
-          puts f + "  Permalink: ".ljust(r) + config["permalink"].to_s
-          puts f + "  Title: ".ljust(r) + config["title"].to_s
-          puts f + "  Limit: ".ljust(r) + config["limit"].to_s
-          puts f + "  Sort by: ".ljust(r) + config["sort_field"].to_s
-          puts f + "  Sort reverse: ".ljust(r) + config["sort_reverse"].to_s
+        return unless @debug
 
-          puts f + " Active Filters"
-          puts f + "  Collection: ".ljust(r) + config["collection"].to_s
-          puts f + "  Offset: ".ljust(r) + config["offset"].to_s
-          puts f + "  Category: ".ljust(r) + (config["category"].nil? || config["category"] == "posts" ? "[Not set]" : config["category"].to_s)
-          puts f + "  Tag: ".ljust(r) + (config["tag"].nil? ? "[Not set]" : config["tag"].to_s)
-          puts f + "  Locale: ".ljust(r) + (config["locale"].nil? ? "[Not set]" : config["locale"].to_s)
-        end
+        puts "#{f}----------------------------"
+        puts "#{f}Page: #{page_path}"
+        puts "#{f} Active configuration"
+        puts f + "  Enabled: ".ljust(r) + config["enabled"].to_s
+        puts f + "  Items per page: ".ljust(r) + config["per_page"].to_s
+        puts f + "  Permalink: ".ljust(r) + config["permalink"].to_s
+        puts f + "  Title: ".ljust(r) + config["title"].to_s
+        puts f + "  Limit: ".ljust(r) + config["limit"].to_s
+        puts f + "  Sort by: ".ljust(r) + config["sort_field"].to_s
+        puts f + "  Sort reverse: ".ljust(r) + config["sort_reverse"].to_s
+
+        puts "#{f} Active Filters"
+        puts f + "  Collection: ".ljust(r) + config["collection"].to_s
+        puts f + "  Offset: ".ljust(r) + config["offset"].to_s
+        puts f + "  Category: ".ljust(r) + (config["category"].nil? || config["category"] == "posts" ? "[Not set]" : config["category"].to_s)
+        puts f + "  Tag: ".ljust(r) + (config["tag"].nil? ? "[Not set]" : config["tag"].to_s)
+        puts f + "  Locale: ".ljust(r) + (config["locale"].nil? ? "[Not set]" : config["locale"].to_s)
       end
       # rubocop:enable Layout/LineLength
 
       # rubocop:disable Layout/LineLength
       def _debug_print_filtering_info(filter_name, before_count, after_count)
         # Debug print the config
-        if @debug
-          puts "Pagination: ".rjust(20) + " Filtering by: " + filter_name.to_s.ljust(9) + " " + before_count.to_s.rjust(3) + " => " + after_count.to_s
-        end
+        return unless @debug
+
+        puts "#{"Pagination: ".rjust(20)} Filtering by: #{filter_name.to_s.ljust(9)} #{before_count.to_s.rjust(3)} => #{after_count}"
       end
       # rubocop:enable Layout/LineLength
 
@@ -255,19 +271,19 @@ module Bridgetown
           # So to unblock this common issue for the date field I simply iterate
           # once over every document and initialize the .date field explicitly
           if @debug
-            puts "Pagination: ".rjust(20) + "Rolling through the date fields for all documents"
+            puts "#{"Pagination: ".rjust(20)}Rolling through the date fields for all documents"
           end
           using_posts.each do |u_post|
-            next unless u_post.respond_to?("date")
+            next unless u_post.respond_to?(:date)
 
             tmp_date = u_post.date
-            if !tmp_date || tmp_date.nil?
-              if @debug
-                puts "Pagination: ".rjust(20) +
-                  "Explicitly assigning date for doc: #{u_post.data["title"]} | #{u_post.path}"
-              end
-              u_post.date = File.mtime(u_post.path)
+            next unless !tmp_date || tmp_date.nil?
+
+            if @debug
+              puts "Pagination: ".rjust(20) +
+                "Explicitly assigning date for doc: #{u_post.data["title"]} | #{u_post.path}"
             end
+            u_post.date = File.mtime(u_post.path)
           end
 
           using_posts.sort! do |a, b|
@@ -324,25 +340,27 @@ module Bridgetown
             cur_page_nr,
             total_pages,
             index_page_with_ext,
-            template.ext
+            template.extname
           )
 
           # 2. Create the url for the in-memory page (calc permalink etc),
           # construct the title, set all page.data values needed
           paginated_page_url = config["permalink"]
           first_index_page_url = if template.data["permalink"]
-                                   Utils.ensure_trailing_slash(
-                                     template.data["permalink"]
-                                   )
+                                   template.data["permalink"]
+                                 elsif template.respond_to?(:relative_url)
+                                   template.relative_url
                                  else
-                                   Utils.ensure_trailing_slash(template.dir)
+                                   template.dir
                                  end
+          first_index_page_url = Utils.ensure_trailing_slash(
+            Utils.remove_double_slash(first_index_page_url)
+          )
           paginated_page_url = File.join(first_index_page_url, paginated_page_url)
 
           # 3. Create the paginator logic for this page, pass in the prev and next
           # page numbers, assign paginator to in-memory page
-          # TODO: remove .pager by v1.0, deprecated
-          newpage.paginator = newpage.pager = Paginator.new(
+          newpage.paginator = Paginator.new(
             config["per_page"],
             first_index_page_url,
             paginated_page_url,
@@ -353,26 +371,11 @@ module Bridgetown
             index_page_ext
           )
 
-          # Create the url for the new page, make sure we prepend any permalinks
-          # that are defined in the template page before
-          if newpage.paginator.page_path.end_with? "/"
-            newpage.set_url(File.join(newpage.paginator.page_path, index_page_with_ext))
-          elsif newpage.paginator.page_path.end_with? index_page_ext.to_s
-            # Support for direct .html files
-            newpage.set_url(newpage.paginator.page_path)
-          else
-            # Support for extensionless permalinks
-            newpage.set_url(newpage.paginator.page_path + index_page_ext.to_s)
-          end
-
+          newpage.set_url(newpage.paginator.page_path)
           newpage.data["permalink"] = newpage.paginator.page_path if template.data["permalink"]
 
           # Transfer the title across to the new page
-          tmp_title = if !template.data["title"]
-                        site_title
-                      else
-                        template.data["title"]
-                      end
+          tmp_title = template.data["title"] || site_title
 
           # If the user specified a title suffix to be added then let's add that
           # to all the pages except the first
@@ -389,8 +392,7 @@ module Bridgetown
           end
 
           # Signals that this page is automatically generated by the pagination logic
-          # (we don't do this for the first page as it is there to mask the one we removed)
-          newpage.data["autogen"] = "bridgetown-paginate" if cur_page_nr > 1
+          newpage.data["autogen"] = "bridgetown-paginate"
 
           # If there's only one post (like on a per_page: 1 scenario), let's be
           # helpful and supply a document variable
@@ -410,40 +412,40 @@ module Bridgetown
         # simplest is to include all of the links to the pages preceeding the
         # current one (e.g for page 1 you get the list 2, 3, 4.... and for
         # page 2 you get the list 3,4,5...)
-        if config["trail"] && !config["trail"].nil? && newpages.size.to_i.positive?
-          trail_before = [config["trail"]["before"].to_i, 0].max
-          trail_after = [config["trail"]["after"].to_i, 0].max
-          trail_length = trail_before + trail_after + 1
+        return unless config["trail"] && !config["trail"].nil? && newpages.size.to_i.positive?
 
-          if trail_before.positive? || trail_after.positive?
-            newpages.select do |npage|
-              # Selecting the beginning of the trail
-              idx_start = [npage.paginator.page - trail_before - 1, 0].max
-              # Selecting the end of the trail
-              idx_end = [idx_start + trail_length, newpages.size.to_i].min
+        trail_before = [config["trail"]["before"].to_i, 0].max
+        trail_after = [config["trail"]["after"].to_i, 0].max
+        trail_length = trail_before + trail_after + 1
 
-              # Always attempt to maintain the max total of <trail_length> pages
-              # in the trail (it will look better if the trail doesn't shrink)
-              if idx_end - idx_start < trail_length
-                # Attempt to pad the beginning if we have enough pages
-                # Never go beyond the zero index
-                idx_start = [
-                  idx_start - (trail_length - (idx_end - idx_start)),
-                  0,
-                ].max
-              end
+        return unless trail_before.positive? || trail_after.positive?
 
-              # Convert the newpages array into a two dimensional array that has
-              # [index, page_url] as items
-              npage.paginator.page_trail = newpages[idx_start...idx_end] \
-                .each_with_index.map do |ipage, idx|
-                PageTrail.new(
-                  idx_start + idx + 1,
-                  ipage.paginator.page_path,
-                  ipage.data["title"]
-                )
-              end
-            end
+        newpages.select do |npage|
+          # Selecting the beginning of the trail
+          idx_start = [npage.paginator.page - trail_before - 1, 0].max
+          # Selecting the end of the trail
+          idx_end = [idx_start + trail_length, newpages.size.to_i].min
+
+          # Always attempt to maintain the max total of <trail_length> pages
+          # in the trail (it will look better if the trail doesn't shrink)
+          if idx_end - idx_start < trail_length
+            # Attempt to pad the beginning if we have enough pages
+            # Never go beyond the zero index
+            idx_start = [
+              idx_start - (trail_length - (idx_end - idx_start)),
+              0,
+            ].max
+          end
+
+          # Convert the newpages array into a two dimensional array that has
+          # [index, page_url] as items
+          npage.paginator.page_trail = newpages[idx_start...idx_end]
+            .each_with_index.map do |ipage, idx|
+            PageTrail.new(
+              idx_start + idx + 1,
+              ipage.paginator.page_path,
+              ipage.data["title"]
+            )
           end
         end
       end

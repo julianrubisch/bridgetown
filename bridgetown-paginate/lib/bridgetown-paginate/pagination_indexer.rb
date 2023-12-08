@@ -7,7 +7,7 @@ module Bridgetown
     # filtering said collections when requested by the defined filters.
     #
     class PaginationIndexer
-      @cached_index = {}
+      @cached_index = {}.compare_by_identity
 
       class << self
         attr_accessor :cached_index
@@ -41,9 +41,9 @@ module Bridgetown
           document_data = document.data[index_key]
           document_data = document_data.split(%r!;|,!) if document_data.is_a?(String)
 
-          document_data.each do |key|
+          Array(document_data).each do |key|
             key = key.to_s.downcase.strip
-            # If the key is a delimetered list of values
+            # If the key is a delimitered list of values
             # (meaning the user didn't use an array but a string with commas)
             key.split(%r!;|,!).each do |k_split|
               k_split = k_split.to_s.downcase.strip # Clean whitespace and junk
@@ -53,10 +53,8 @@ module Bridgetown
           end
         end
 
-        unless cached_index[all_documents.object_id].is_a?(Hash)
-          cached_index[all_documents.object_id] = {}
-        end
-        cached_index[all_documents.object_id][index_key] = index
+        cached_index[all_documents] = {} unless cached_index[all_documents].is_a?(Hash)
+        cached_index[all_documents][index_key] = index
         index
       end
 

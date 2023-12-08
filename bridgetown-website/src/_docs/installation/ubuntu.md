@@ -1,8 +1,9 @@
 ---
 title: Bridgetown on Ubuntu
-hide_in_toc: true
-category: installation
-ruby_version: 2.6.6
+top_section: Setup
+category: installation-guides
+back_to: installation
+ruby_version: 3.0.2
 order: 0
 ---
 
@@ -19,8 +20,10 @@ sudo apt update
 Next, install the dependencies required to install Ruby:
 
 ```sh
-sudo apt install autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm5 libgdbm-dev
+sudo apt-get install autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev libffi-dev libgdbm6 libgdbm-dev libdb-dev
 ```
+
+(If on an older Ubuntu version, `libgdbm6` won't be available. Try installing `libgdbm5` instead.)
 
 Once the dependencies download, you can install rbenv itself. Clone the rbenv repository from GitHub into the directory `~/.rbenv`:
 
@@ -55,7 +58,6 @@ type rbenv
 Your terminal window will display the following:
 
 ```sh
-Output
 rbenv is a function
 …
 ```
@@ -66,20 +68,19 @@ Next, install the `ruby-build` plugin. This plugin adds the `rbenv install` comm
 git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
 ```
 
-Now you can install a new Ruby version. At the time of this writing, Ruby 2.6.6 is a fast and stable option. You'll also want to install Bundler to manage Rubygem dependencies.
+Now you can install a new Ruby version. At the time of this writing, Ruby {{ resource.data.ruby_version }} is the latest stable version. (Note: the installation may take a few minutes to complete.)
 
 ```sh
-rbenv install {{ page.ruby_version }}
-rbenv global {{ page.ruby_version }}
+rbenv install {{ resource.data.ruby_version }}
+rbenv global {{ resource.data.ruby_version }}
 
 ruby -v
-> ruby 2.6.6p146 (2020-03-31 revision 67876) [x86_64-linux]
-
-gem install bundler -N
+> ruby 3.0.2p107 (2021-07-07 revision 0db68f0233) [aarch64-linux]
 ```
 
-And that's it! Head over [rbenv command references](https://github.com/rbenv/rbenv#command-reference) to learn how to use different versions of Ruby in your projects.
+(If for some reason `bundler` isn't installed automatically, just run `gem install bundler -N`)
 
-{% render "docs/install/node_on_linux" %}
-{% render "docs/install/bridgetown" %}
-{% render "docs/install/concurrently" %}
+And that's it! Check out [rbenv command references](https://github.com/rbenv/rbenv#command-reference) to learn how to use different versions of Ruby in your projects.
+
+{%@ "docs/install/node_on_linux" %}
+{%@ "docs/install/bridgetown" %}

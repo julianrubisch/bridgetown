@@ -27,7 +27,7 @@ Not only that, but ERB/Haml/Slim templates are automatically supplied with the f
 
 Want to add your own helpers? No problem! Simply decorate the `Bridgetown::RubyTemplateView::Helpers` class or add a mixin.
 
-All this and more is well-documented in [ERB and Beyond](/docs/erb-and-beyond). If you run into any problems or have suggestions on how to improve template support, [please let us know!](/docs/community)
+All this and more is well-documented in [ERB and Beyond](/docs/erb-and-beyond). If you run into any problems or have suggestions on how to improve template support, [please let us know!](/community)
 
 ### Class Map Liquid Tag
 
@@ -35,7 +35,6 @@ One of the patterns we've noticed that can get really messy when writing [Liquid
 
 But not anymore! Introducing `class_map`:
 
-<!-- linthtml-configure tag-bans="false" -->
 {% raw %}
 ```liquid
 <div class="{% class_map has-centered-text: page.centered, is-small: small-var %}">
@@ -43,11 +42,9 @@ But not anymore! Introducing `class_map`:
 </div>
 ```
 {% endraw %}
-<!-- linthtml-configure tag-bans="true" -->
 
 In this example, the `class_map` tag will include `has-text-centered` only if `page.centered` is truthy, and likewise `is-small` only if `small-var` is truthy. If you need to run a comparison with a specific value, you'll still need to use `assign` but it'll still be simpler than in the past:
 
-<!-- linthtml-configure tag-bans="false" -->
 {% raw %}
 ```liquid
 {% if product.feature_in == "socks" %}{% assign should_bold = true %}{% endif %}
@@ -56,7 +53,6 @@ In this example, the `class_map` tag will include `has-text-centered` only if `p
 </div>
 ```
 {% endraw %}
-<!-- linthtml-configure tag-bans="true" -->
 
 ### Codebase Grooming
 

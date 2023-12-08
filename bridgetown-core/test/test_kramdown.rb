@@ -41,10 +41,9 @@ class TestKramdown < BridgetownUnitTest
         },
       }
       @kramdown_config_keys = @config["kramdown"].keys
-      @syntax_highlighter_opts_config_keys = \
+      @syntax_highlighter_opts_config_keys =
         @config["kramdown"]["syntax_highlighter_opts"].keys
 
-      @config = Bridgetown.configuration(@config)
       @converter = fixture_converter(@config)
     end
 
@@ -56,6 +55,11 @@ class TestKramdown < BridgetownUnitTest
 
     should "run Kramdown" do
       assert_equal "<h1>Some Header</h1>", @converter.convert("# Some Header #").strip
+    end
+
+    should "render mark tags" do
+      assert_equal "<p>This is <mark>highlighted</mark> like <mark>this.</mark></p>",
+                   @converter.convert("This is ::highlighted:: like ==this.==").strip
     end
 
     should "should log kramdown warnings" do
@@ -79,7 +83,7 @@ class TestKramdown < BridgetownUnitTest
       should "convert" do
         converter = fixture_converter(@config)
         assert_match(
-          %r!<p>(&#8220;|“)Pit(&#8217;|’)hy(&#8221;|”)<\/p>!,
+          %r!<p>(&#8220;|“)Pit(&#8217;|’)hy(&#8221;|”)</p>!,
           converter.convert(%("Pit'hy")).strip
         )
       end
@@ -92,7 +96,7 @@ class TestKramdown < BridgetownUnitTest
           },
         }
         converter = fixture_converter(Utils.deep_merge_hashes(@config, override))
-        assert_match %r!<p>(&#171;|«)Pit(&#8250;|›)hy(&#187;|»)<\/p>!, \
+        assert_match %r!<p>(&#171;|«)Pit(&#8250;|›)hy(&#187;|»)</p>!, \
                      converter.convert(%("Pit'hy")).strip
       end
     end

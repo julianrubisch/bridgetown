@@ -1,92 +1,116 @@
 # frozen_string_literal: true
 
 module Bridgetown
-  # Holds the processed configuration loaded from the YAML config file.
-  #
-  # @todo refactor this whole object! Already had to fix obscure
-  #   bugs just making minor changes, and all the indirection is
-  #   quite hard to decipher. -JW
+  # The primary configuration object for a Bridgetown project
   class Configuration < HashWithDotAccess::Hash
-    # Default options. Overridden by values in bridgetown.config.yml.
+    REQUIRE_DENYLIST = %i(parse_routes ssr) # rubocop:disable Style/MutableConstant
+
+    Initializer = Struct.new(:name, :block, :completed, keyword_init: true) do
+      def to_s
+        "#{name} (Initializer)"
+      end
+    end
+
+    SourceManifest = Struct.new(:origin, :components, :content, :layouts, keyword_init: true)
+
+    Preflight = Struct.new(:source_manifests, :initializers, keyword_init: true) do
+      def initialize(*)
+        super
+        self.source_manifests ||= Set.new
+      end
+    end
+
+    require_relative "configuration/configuration_dsl"
+
+    # Default options. Overridden by values in bridgetown.config.yml or initializers.
     # Strings rather than symbols are used for compatibility with YAML.
     DEFAULTS = {
       # Where things are
-      "root_dir"             => Dir.pwd,
-      "plugins_dir"          => "plugins",
-      "source"               => File.join(Dir.pwd, "src"),
-      "destination"          => File.join(Dir.pwd, "output"),
-      "collections_dir"      => "",
-      "cache_dir"            => ".bridgetown-cache",
-      "layouts_dir"          => "_layouts",
-      "data_dir"             => "_data",
-      "components_dir"       => "_components",
-      "includes_dir"         => "_includes",
-      "partials_dir"         => "_partials",
-      "collections"          => {},
+      "root_dir"                   => Dir.pwd,
+      "plugins_dir"                => "plugins",
+      "source"                     => "src",
+      "destination"                => "output",
+      "collections_dir"            => "",
+      "cache_dir"                  => ".bridgetown-cache",
+      "layouts_dir"                => "_layouts",
+      "components_dir"             => "_components",
+      "islands_dir"                => "_islands",
+      "partials_dir"               => "_partials",
+      "collections"                => {},
+      "taxonomies"                 => {
+        category: { key: "categories", title: "Category" }, tag: { key: "tags", title: "Tag" },
+      },
+      "autoload_paths"             => [],
+      "inflector"                  => nil,
+      "eager_load_paths"           => [],
+      "autoloader_collapsed_paths" => [],
+      "additional_watch_paths"     => [],
 
       # Handling Reading
-      "include"              => [".htaccess", "_redirects", ".well-known"],
-      "exclude"              => [],
-      "keep_files"           => [".git", ".svn", "_bridgetown"],
-      "encoding"             => "utf-8",
-      "markdown_ext"         => "markdown,mkdown,mkdn,mkd,md",
-      "strict_front_matter"  => false,
-      "slugify_categories"   => true,
+      "include"                    => [".htaccess", "_redirects", ".well-known"],
+      "exclude"                    => [],
+      "keep_files"                 => [".git", ".svn", "_bridgetown"],
+      "encoding"                   => "utf-8",
+      "markdown_ext"               => "markdown,mkdown,mkdn,mkd,md",
+      "strict_front_matter"        => false,
+      "slugify_mode"               => "pretty",
 
       # Filtering Content
-      "limit_posts"          => 0,
-      "future"               => false,
-      "unpublished"          => false,
-      "ruby_in_front_matter" => true,
+      "future"                     => false,
+      "unpublished"                => false,
+      "ruby_in_front_matter"       => true,
 
       # Conversion
-      "markdown"             => "kramdown",
-      "highlighter"          => "rouge",
-      "lsi"                  => false,
-      "excerpt_separator"    => "\n\n",
-      "incremental"          => false,
+      "content_engine"             => "resource",
+      "markdown"                   => "kramdown",
+      "highlighter"                => "rouge",
 
       # Serving
-      "detach"               => false, # default to not detaching the server
-      "port"                 => "4000",
-      "host"                 => "127.0.0.1",
-      "baseurl"              => nil, # this mounts at /, i.e. no subdirectory
-      "show_dir_listing"     => false,
+      "port"                       => "4000",
+      "host"                       => "127.0.0.1",
+      "base_path"                  => "/",
+      "show_dir_listing"           => false,
 
       # Output Configuration
-      "available_locales"    => ["en"],
-      "default_locale"       => "en",
-      "permalink"            => "date",
-      "timezone"             => nil, # use the local timezone
+      "available_locales"          => [:en],
+      "default_locale"             => :en,
+      "prefix_default_locale"      => false,
+      "permalink"                  => nil, # default is set according to content engine
+      "timezone"                   => nil, # use the local timezone
 
-      "quiet"                => false,
-      "verbose"              => false,
-      "defaults"             => [],
+      "quiet"                      => false,
+      "verbose"                    => false,
+      "defaults"                   => [],
 
-      "liquid"               => {
+      "liquid"                     => {
         "error_mode"       => "warn",
         "strict_filters"   => false,
         "strict_variables" => false,
       },
 
-      "kramdown"             => {
-        "auto_ids"      => true,
-        "toc_levels"    => (1..6).to_a,
-        "entity_output" => "as_char",
-        "smart_quotes"  => "lsquo,rsquo,ldquo,rdquo",
-        "input"         => "GFM",
-        "hard_wrap"     => false,
-        "guess_lang"    => true,
-        "footnote_nr"   => 1,
-        "show_warnings" => false,
+      "kramdown"                   => {
+        "auto_ids"                => true,
+        "toc_levels"              => (1..6).to_a,
+        "entity_output"           => "as_char",
+        "smart_quotes"            => "lsquo,rsquo,ldquo,rdquo",
+        "input"                   => "GFM",
+        "hard_wrap"               => false,
+        "guess_lang"              => true,
+        "footnote_nr"             => 1,
+        "show_warnings"           => false,
+        "include_extraction_tags" => false,
+        "mark_highlighting"       => true,
       },
     }.each_with_object(Configuration.new) { |(k, v), hsh| hsh[k] = v.freeze }.freeze
 
-    # The modern default config file name is bridgetown.config.EXT, but we also
-    # need to check for _config.EXT as a backward-compatibility nod to our
-    # progenitor
+    # TODO: Deprecated. Remove support for _config as well as toml in the next release.
     CONFIG_FILE_PREFIXES = %w(bridgetown.config _config).freeze
     CONFIG_FILE_EXTS = %w(yml yaml toml).freeze
+
+    # @return [Hash<Symbol, Initializer>]
+    attr_accessor :initializers
+
+    attr_writer :source_manifests, :roda_initializers
 
     class << self
       # Static: Produce a Configuration ready for use in a Site.
@@ -95,12 +119,55 @@ module Bridgetown
       # user_config - a Hash or Configuration of overrides.
       #
       # Returns a Configuration filled with defaults.
-      def from(user_config)
-        Utils.deep_merge_hashes(DEFAULTS, Configuration[user_config])
+      def from(user_config, starting_defaults = DEFAULTS)
+        Utils.deep_merge_hashes(starting_defaults.deep_dup, Configuration.new(user_config))
           .merge_environment_specific_options!
+          .setup_load_paths!
+          .setup_locales
           .add_default_collections
           .add_default_excludes
           .check_include_exclude
+      end
+    end
+
+    def run_initializers!(context:) # rubocop:todo Metrics/AbcSize, Metrics/CyclomaticComplexity
+      initializers_file = File.join(root_dir, "config", "initializers.rb")
+      return unless File.file?(initializers_file)
+
+      load initializers_file
+
+      return unless initializers # no initializers have been set up
+
+      init_init = initializers[:init]
+      return unless init_init && !init_init.completed
+
+      Bridgetown.logger.debug "Initializing:", "Running initializers with `#{context}' context in:"
+      Bridgetown.logger.debug "", initializers_file
+      self.init_params = {}
+      cached_url = url&.include?("//localhost") ? url : nil
+      dsl = ConfigurationDSL.new(scope: self, data: self)
+      dsl.instance_variable_set(:@context, context)
+      dsl.instance_exec(dsl, &init_init.block)
+      self.url = cached_url if cached_url # restore local development URL if need be
+
+      setup_load_paths! appending: true
+
+      self
+    end
+
+    # @return [Set<SourceManifest>]
+    def source_manifests
+      @source_manifests ||= Set.new
+    end
+
+    # @return [Array<Proc>]
+    def roda_initializers
+      @roda_initializers ||= []
+    end
+
+    def initialize_roda_app(app)
+      roda_initializers.each do |initializer|
+        initializer.(app)
       end
     end
 
@@ -108,21 +175,21 @@ module Bridgetown
       override[config_key] || self[config_key] || DEFAULTS[config_key]
     end
 
-    # Public: Directory of the top-level root where config files are located
+    # Directory of the top-level root where config files are located
     #
-    # override - the command-line options hash
+    # @param override [Hash] options hash which will override value if key is present
     #
-    # Returns the path to the Bridgetown root directory
-    def root_dir(override)
+    # @return [String] path to the Bridgetown root directory
+    def root_dir(override = {})
       get_config_value_with_override("root_dir", override)
     end
 
     # Public: Directory of the Bridgetown source folder
     #
-    # override - the command-line options hash
+    # @param override [Hash] options hash which will override value if key is present
     #
-    # Returns the path to the Bridgetown source directory
-    def source(override)
+    # @return [String]  path to the Bridgetown source directory
+    def source(override = {})
       get_config_value_with_override("source", override)
     end
 
@@ -136,17 +203,35 @@ module Bridgetown
     end
     alias_method :verbose?, :verbose
 
-    def safe_load_file(filename)
+    def safe_load_file(filename) # rubocop:todo Metrics
       case File.extname(filename)
       when %r!\.toml!i
-        Bridgetown::External.require_with_graceful_fail("tomlrb") unless defined?(Tomlrb)
+        Deprecator.deprecation_message(
+          "TOML configurations will no longer be supported in the next version of Bridgetown." \
+          "Use initializers or a .yaml config instead."
+        )
+        Bridgetown::Utils::RequireGems.require_with_graceful_fail("tomlrb") unless defined?(Tomlrb)
         Tomlrb.load_file(filename)
       when %r!\.ya?ml!i
-        SafeYAML.load_file(filename) || {}
+        if File.basename(filename, ".*") == "_config"
+          Deprecator.deprecation_message(
+            "YAML configurations named `_config.y(a)ml' will no longer be supported in the next " \
+            "version of Bridgetown. Rename to `bridgetown.config.yml' instead."
+          )
+        end
+        if File.extname(filename) == ".yaml"
+          Deprecator.deprecation_message(
+            "YAML configurations ending in `.yaml' will no longer be supported in the next " \
+            "version of Bridgetown. Rename to use `.yml' extension instead."
+          )
+        end
+        YAMLParser.load_file(filename) || {}
       else
         raise ArgumentError,
-              "No parser for '#{filename}' is available. Use a .y(a)ml or .toml file instead."
+              "No parser for '#{filename}' is available. Use a .y(a)ml file instead."
       end
+    rescue Psych::DisallowedClass => e
+      raise "Unable to parse `#{File.basename(filename)}'. #{e.message}"
     end
 
     # Public: Generate list of configuration files from the override
@@ -200,8 +285,8 @@ module Bridgetown
           config = Utils.deep_merge_hashes(self, new_config)
         end
       rescue ArgumentError => e
-        Bridgetown.logger.warn "WARNING:", "Error reading configuration. Using defaults" \
-                                " (and options)."
+        Bridgetown.logger.warn "WARNING:", "Error reading configuration. Using defaults " \
+                                           "(and options)."
         warn e
       end
 
@@ -221,11 +306,12 @@ module Bridgetown
         raise ArgumentError, "Configuration file: (INVALID) #{file}".yellow
       end
 
-      Bridgetown.logger.info "Configuration file:", file
+      Bridgetown.logger.debug "Configuration file:", file
       next_config
     rescue SystemCallError
       if @default_config_file ||= nil
-        Bridgetown.logger.warn "Configuration file:", "none"
+        initializers_file = File.join(root_dir, "config", "initializers.rb")
+        Bridgetown.logger.warn "Configuration file:", "none" unless File.file?(initializers_file)
         {}
       else
         Bridgetown.logger.error "Fatal:", "The configuration file '#{file}' could not be found."
@@ -239,27 +325,79 @@ module Bridgetown
         self[k] = self[Bridgetown.environment][k]
       end
       delete(Bridgetown.environment)
+
       self
     end
 
-    def add_default_collections
+    def setup_load_paths!(appending: false) # rubocop:todo Metrics
+      unless appending
+        self[:root_dir] = File.expand_path(self[:root_dir])
+        self[:source] = File.expand_path(self[:source], self[:root_dir])
+        self[:destination] = File.expand_path(self[:destination], self[:root_dir])
+
+        autoload_paths.unshift({
+          path: self[:plugins_dir],
+          eager: true,
+        })
+        autoload_paths.unshift({
+          path: File.expand_path(self[:islands_dir], self[:source]),
+          eager: true,
+        })
+      end
+
+      autoload_paths.map! do |load_path|
+        if load_path.is_a?(Hash)
+          expanded = File.expand_path(load_path[:path], self[:root_dir])
+          self[:eager_load_paths] << expanded if load_path[:eager]
+          next expanded
+        end
+
+        File.expand_path(load_path, self[:root_dir])
+      end
+
+      autoloader_collapsed_paths.map! do |collapsed_path|
+        File.expand_path(collapsed_path, self[:root_dir])
+      end
+
+      additional_watch_paths.map! do |collapsed_path|
+        File.expand_path(collapsed_path, self[:root_dir])
+      end
+
+      self
+    end
+
+    def setup_locales
+      self.default_locale = default_locale.to_sym
+      available_locales.map!(&:to_sym)
+      self
+    end
+
+    def add_default_collections # rubocop:todo all
       # It defaults to `{}`, so this is only if someone sets it to null manually.
-      return self if self["collections"].nil?
+      return self if self[:collections].nil?
 
       # Ensure we have a hash.
-      if self["collections"].is_a?(Array)
-        self["collections"] = self["collections"].each_with_object({}) do |collection, hash|
+      if self[:collections].is_a?(Array)
+        self[:collections] = self[:collections].each_with_object({}) do |collection, hash|
           hash[collection] = {}
         end
       end
 
-      self["collections"] = Utils.deep_merge_hashes(
-        { "posts" => {} }, self["collections"]
-      ).tap do |collections|
-        collections["posts"]["output"] = true
-        if self["permalink"]
-          collections["posts"]["permalink"] ||= style_to_permalink(self["permalink"])
-        end
+      # Setup default collections
+      self[:collections][:posts] = {} unless self[:collections][:posts]
+      self[:collections][:posts][:output] = true
+      self[:collections][:posts][:sort_direction] ||= "descending"
+
+      self[:permalink] = "pretty" if self[:permalink].blank?
+      self[:collections][:pages] = {} unless self[:collections][:pages]
+      self[:collections][:pages][:output] = true
+      self[:collections][:pages][:permalink] ||= "/:locale/:path/"
+
+      self[:collections][:data] = {} unless self[:collections][:data]
+      self[:collections][:data][:output] = false
+
+      unless self[:collections][:posts][:permalink]
+        self[:collections][:posts][:permalink] = self[:permalink]
       end
 
       self
@@ -267,7 +405,7 @@ module Bridgetown
 
     DEFAULT_EXCLUDES = %w(
       .sass-cache .bridgetown-cache
-      gemfiles Gemfile Gemfile.lock
+      gemfiles Gemfile Gemfile.lock gems.rb gems.locked
       node_modules
       vendor/bundle/ vendor/cache/ vendor/gems/ vendor/ruby/
     ).freeze
@@ -284,27 +422,6 @@ module Bridgetown
         self["ruby_in_front_matter"]
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity #
-    def style_to_permalink(permalink_style)
-      case permalink_style.to_sym
-      when :pretty
-        "/:categories/:year/:month/:day/:title/"
-      when :simple
-        "/:categories/:title/"
-      when :none
-        "/:categories/:title:output_ext"
-      when :date
-        "/:categories/:year/:month/:day/:title:output_ext"
-      when :ordinal
-        "/:categories/:year/:y_day/:title:output_ext"
-      when :weekdate
-        "/:categories/:year/W:week/:short_day/:title:output_ext"
-      else
-        permalink_style.to_s
-      end
-    end
-    # rubocop:enable Metrics/CyclomaticComplexity #
-
     def check_include_exclude
       %w(include exclude).each do |option|
         next unless key?(option)
@@ -314,10 +431,14 @@ module Bridgetown
               "'#{option}' should be set as an array, but was: #{self[option].inspect}."
       end
 
-      # add _pages to includes set
-      self[:include] << "_pages"
-
       self
+    end
+
+    # Whether or not PostCSS is being used to process stylesheets.
+    #
+    # @return [Boolean] true if `postcss.config.js` exists, false if not
+    def uses_postcss?
+      File.exist?(Bridgetown.sanitized_path(root_dir, "postcss.config.js"))
     end
   end
 end

@@ -7,8 +7,8 @@ class TestFilters < BridgetownUnitTest
     include Bridgetown::Filters
     attr_accessor :site, :context
 
-    def initialize(opts = {})
-      @site = Bridgetown::Site.new(opts.merge("skip_config_files" => true))
+    def initialize(opts)
+      @site = Bridgetown::Site.new(opts)
       @context = Liquid::Context.new(@site.site_payload, {}, site: @site)
     end
   end
@@ -24,14 +24,28 @@ class TestFilters < BridgetownUnitTest
   end
 
   def make_filter_mock(opts = {})
-    BridgetownFilter.new(site_configuration(opts)).tap do |f|
-      tz = f.site.config["timezone"]
-      Bridgetown.set_timezone(tz) if tz
-    end
+    BridgetownFilter.new(site_configuration(opts.merge("skip_config_files" => true)))
   end
 
   class SelectDummy
     def select; end
+  end
+
+  M = Struct.new(:message) do
+    def to_liquid
+      [message]
+    end
+  end
+
+  T = Struct.new(:name) do
+    def to_liquid
+      {
+        "name" => name,
+        :v     => 1,
+        :thing => M.new({ kay: "jewelers" }),
+        :stuff => true,
+      }
+    end
   end
 
   context "filters" do
@@ -40,11 +54,12 @@ class TestFilters < BridgetownUnitTest
       @filter = make_filter_mock(
         "timezone"               => "UTC",
         "url"                    => "http://example.com",
-        "baseurl"                => "/base",
+        "base_path"              => "/base",
         "dont_show_posts_before" => @sample_time
       )
       @sample_date = Date.parse("2013-03-02")
       @time_as_string = "September 11, 2001 12:46:30 -0000"
+      @date_as_string = "1995-12-21"
       @time_as_numeric = 1_399_680_607
       @integer_as_string = "142857"
       @array_of_objects = [
@@ -360,6 +375,174 @@ class TestFilters < BridgetownUnitTest
       end
     end
 
+    context "translation filters" do
+      setup do
+        @filter.site.config.available_locales = I18n.available_locales = [:eo, :fr]
+        @filter.site.config.default_locale = I18n.locale = :eo
+      end
+
+      context "lookup" do
+        should "translate error message with default locale" do
+          assert_equal "ne estas nombro", @filter.t("errors.messages.not_a_number")
+        end
+
+        should "translate error message with french locale" do
+          assert_equal "n'est pas un nombre", @filter.t("errors.messages.not_a_number", "locale:fr")
+        end
+      end
+
+      context "pluralization" do
+        should "translate distance message with default locale" do
+          assert_equal "ĉirkaŭ unu horo", @filter.t("datetime.distance_in_words.about_x_hours", "count:1")
+        end
+
+        should "translate pluralized distance message with default locale" do
+          assert_equal "ĉirkaŭ 3 horoj", @filter.t("datetime.distance_in_words.about_x_hours", "count:3")
+        end
+
+        should "translate distance message with french locale" do
+          assert_equal "environ une heure", @filter.t("datetime.distance_in_words.about_x_hours", "count:1, locale:fr")
+        end
+
+        should "translate pluralized distance message with french locale" do
+          assert_equal "environ 3 heures", @filter.t("datetime.distance_in_words.about_x_hours", "locale:fr,  count:3")
+        end
+      end
+
+      context "defaults" do
+        should "translate missing message with default locale" do
+          assert_equal "foo", @filter.t("missing", "default:foo")
+        end
+
+        should "translate missing message with french locale" do
+          assert_equal "foo", @filter.t("missing", "locale:fr, default:foo")
+        end
+      end
+
+      context "scope" do
+        should "translate error message with default locale" do
+          assert_equal "ne estas nombro", @filter.t("messages.not_a_number", "scope:errors")
+        end
+
+        should "translate error message with french locale" do
+          assert_equal "n'est pas un nombre", @filter.t("messages.not_a_number", "locale:fr, scope:errors")
+        end
+      end
+
+      context "without input" do
+        should "return input" do
+          assert_nil(@filter.t(nil))
+          assert_equal("", @filter.t(""))
+        end
+      end
+    end
+
+    context "localization filters" do
+      setup do
+        @filter.site.config.available_locales = I18n.available_locales = [:eo, :fr]
+        @filter.site.config.default_locale = I18n.locale = :eo
+      end
+
+      context "with Time object" do
+        should "format a datetime with default format" do
+          assert_equal "27 marto 2013 11:22:33", @filter.l(@sample_time)
+        end
+
+        should "format a datetime with short format" do
+          assert_equal "27 mar. 11:22", @filter.l(@sample_time, "short")
+        end
+
+        should "format a datetime with short format in french locale" do
+          assert_equal "27 mars 11h22", @filter.l(@sample_time, "short", "fr")
+        end
+
+        should "format a datetime with default format in french locale" do
+          assert_equal "27 mars 2013 11h 22min 33s", @filter.l(@sample_time, "fr")
+        end
+      end
+
+      context "with Date object" do
+        should "format a date with default format" do
+          assert_equal "2013/03/02", @filter.l(@sample_date)
+        end
+
+        should "format a date with short format" do
+          assert_equal "2 mar.", @filter.l(@sample_date, "short")
+        end
+
+        should "format a date with short format in french locale" do
+          assert_equal "2 mars", @filter.l(@sample_date, "short", "fr")
+        end
+
+        should "format a date with default format in french locale" do
+          assert_equal "02/03/2013", @filter.l(@sample_date, "fr")
+        end
+      end
+
+      context "with String object" do
+        context "representing a time" do
+          should "format a datetime with default format" do
+            assert_equal "11 septembro 2001 12:46:30", @filter.l(@time_as_string)
+          end
+
+          should "format a datetime with short format" do
+            assert_equal "11 sep. 12:46", @filter.l(@time_as_string, "short")
+          end
+
+          should "format a datetime with short format in french locale" do
+            assert_equal "11 sept. 12h46", @filter.l(@time_as_string, "short", "fr")
+          end
+
+          should "format a datetime with default format in french locale" do
+            assert_equal "11 septembre 2001 12h 46min 30s", @filter.l(@time_as_string, "fr")
+          end
+        end
+
+        context "representing a date" do
+          should "format a date with default format" do
+            assert_equal "21 decembro 1995 00:00:00", @filter.l(@date_as_string)
+          end
+
+          should "format a date with short format" do
+            assert_equal "21 dec. 00:00", @filter.l(@date_as_string, "short")
+          end
+
+          should "format a date with short format in french locale" do
+            assert_equal "21 déc. 00h00", @filter.l(@date_as_string, "short", "fr")
+          end
+
+          should "format a date with default format in french locale" do
+            assert_equal "21 décembre 1995 00h 00min 00s", @filter.l(@date_as_string, "fr")
+          end
+        end
+      end
+
+      context "with a Numeric object" do
+        should "format a datetime with default format" do
+          assert_equal "10 majo 2014 00:10:07", @filter.l(@time_as_numeric)
+        end
+
+        should "format a datetime with short format" do
+          assert_equal "10 majo 00:10", @filter.l(@time_as_numeric, "short")
+        end
+
+        should "format a datetime with short format in french locale" do
+          assert_equal "10 mai 00h10", @filter.l(@time_as_numeric, "short", "fr")
+        end
+
+        should "format a datetime with default format in french locale" do
+          assert_equal "10 mai 2014 00h 10min 07s", @filter.l(@time_as_numeric, "fr")
+        end
+      end
+
+      context "without input" do
+        should "return input" do
+          assert_nil(@filter.l(nil))
+          assert_equal("", @filter.l(""))
+        end
+      end
+    end
+
     should "escape xml with ampersands" do
       assert_equal "AT&amp;T", @filter.xml_escape("AT&T")
       assert_equal(
@@ -397,7 +580,7 @@ class TestFilters < BridgetownUnitTest
 
     should "obfuscate email addresses" do
       assert_match(
-        %r!>2:=E@iE6DEo6I2>A=6]4@>!,
+        %r!>2:=E@iE6DEo6I2>A=6\]4@>!,
         @filter.obfuscate_link("test@example.com")
       )
     end
@@ -427,11 +610,11 @@ class TestFilters < BridgetownUnitTest
         assert_equal "http://example.com/base/#{page_url}", @filter.absolute_url(page_url)
       end
 
-      should "ensure the leading slash for the baseurl" do
+      should "ensure the leading slash for the base_path" do
         page_url = "about/my_favorite_page/"
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => "base"
+          "url"       => "http://example.com",
+          "base_path" => "base"
         )
         assert_equal "http://example.com/base/#{page_url}", filter.absolute_url(page_url)
       end
@@ -439,8 +622,8 @@ class TestFilters < BridgetownUnitTest
       should "be ok with a blank but present 'url'" do
         page_url = "about/my_favorite_page/"
         filter = make_filter_mock(
-          "url"     => "",
-          "baseurl" => "base"
+          "url"       => "",
+          "base_path" => "base"
         )
         assert_equal "/base/#{page_url}", filter.absolute_url(page_url)
       end
@@ -448,17 +631,17 @@ class TestFilters < BridgetownUnitTest
       should "be ok with a nil 'url'" do
         page_url = "about/my_favorite_page/"
         filter = make_filter_mock(
-          "url"     => nil,
-          "baseurl" => "base"
+          "url"       => nil,
+          "base_path" => "base"
         )
         assert_equal "/base/#{page_url}", filter.absolute_url(page_url)
       end
 
-      should "be ok with a nil 'baseurl'" do
+      should "be ok with a nil 'base_path'" do
         page_url = "about/my_favorite_page/"
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => nil
+          "url"       => "http://example.com",
+          "base_path" => nil
         )
         assert_equal "http://example.com/#{page_url}", filter.absolute_url(page_url)
       end
@@ -466,8 +649,8 @@ class TestFilters < BridgetownUnitTest
       should "not prepend a forward slash if input is empty" do
         page_url = ""
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => "/base"
+          "url"       => "http://example.com",
+          "base_path" => "/base"
         )
         assert_equal "http://example.com/base", filter.absolute_url(page_url)
       end
@@ -475,26 +658,26 @@ class TestFilters < BridgetownUnitTest
       should "not append a forward slash if input is '/'" do
         page_url = "/"
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => "/base"
+          "url"       => "http://example.com",
+          "base_path" => "/base"
         )
         assert_equal "http://example.com/base/", filter.absolute_url(page_url)
       end
 
-      should "not append a forward slash if input is '/' and nil 'baseurl'" do
+      should "not append a forward slash if input is '/' and nil 'base_path'" do
         page_url = "/"
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => nil
+          "url"       => "http://example.com",
+          "base_path" => nil
         )
         assert_equal "http://example.com/", filter.absolute_url(page_url)
       end
 
-      should "not append a forward slash if both input and baseurl are simply '/'" do
+      should "not append a forward slash if both input and base_path are simply '/'" do
         page_url = "/"
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => "/"
+          "url"       => "http://example.com",
+          "base_path" => "/"
         )
         assert_equal "http://example.com/", filter.absolute_url(page_url)
       end
@@ -502,8 +685,8 @@ class TestFilters < BridgetownUnitTest
       should "normalize international URLs" do
         page_url = ""
         filter = make_filter_mock(
-          "url"     => "http://ümlaut.example.org/",
-          "baseurl" => nil
+          "url"       => "http://ümlaut.example.org/",
+          "base_path" => nil
         )
         assert_equal "http://xn--mlaut-jva.example.org/", filter.absolute_url(page_url)
       end
@@ -526,16 +709,18 @@ class TestFilters < BridgetownUnitTest
       context "with a document" do
         setup do
           @site = fixture_site(
-            "collections" => ["methods"]
+            "url"         => "http://example.com",
+            "base_path"   => "/base",
+            "collections" => { methods: { output: true } }
           )
           @site.process
-          @document = @site.collections["methods"].docs.detect do |d|
-            d.relative_path == "_methods/configuration.md"
+          @document = @site.collections["methods"].resources.detect do |d|
+            d.relative_path.to_s == "_methods/configuration.md"
           end
         end
 
         should "make a url" do
-          expected = "http://example.com/base/methods/configuration.html"
+          expected = "http://example.com/base/methods/configuration/"
           assert_equal expected, @filter.absolute_url(@document)
         end
       end
@@ -547,14 +732,14 @@ class TestFilters < BridgetownUnitTest
         assert_equal "/base#{page_url}", @filter.relative_url(page_url)
       end
 
-      should "ensure the leading slash between baseurl and input" do
+      should "ensure the leading slash between base_path and input" do
         page_url = "about/my_favorite_page/"
         assert_equal "/base/#{page_url}", @filter.relative_url(page_url)
       end
 
-      should "ensure the leading slash for the baseurl" do
+      should "ensure the leading slash for the base_path" do
         page_url = "about/my_favorite_page/"
-        filter = make_filter_mock("baseurl" => "base")
+        filter = make_filter_mock("base_path" => "base")
         assert_equal "/base/#{page_url}", filter.relative_url(page_url)
       end
 
@@ -563,11 +748,11 @@ class TestFilters < BridgetownUnitTest
         assert_equal "/base/%E9%94%99%E8%AF%AF.html", @filter.relative_url(page_url)
       end
 
-      should "be ok with a nil 'baseurl'" do
+      should "be ok with a nil 'base_path'" do
         page_url = "about/my_favorite_page/"
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => nil
+          "url"       => "http://example.com",
+          "base_path" => nil
         )
         assert_equal "/#{page_url}", filter.relative_url(page_url)
       end
@@ -575,52 +760,46 @@ class TestFilters < BridgetownUnitTest
       should "not prepend a forward slash if input is empty" do
         page_url = ""
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => "/base"
+          "url"       => "http://example.com",
+          "base_path" => "/base"
         )
         assert_equal "/base", filter.relative_url(page_url)
       end
 
-      should "not prepend a forward slash if baseurl ends with a single '/'" do
+      should "not prepend a forward slash if base_path ends with a single '/'" do
         page_url = "/css/main.css"
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => "/base/"
+          "url"       => "http://example.com",
+          "base_path" => "/base/"
         )
         assert_equal "/base/css/main.css", filter.relative_url(page_url)
       end
 
-      should "not return valid URI if baseurl ends with multiple '/'" do
+      should "not return valid URI if base_path ends with multiple '/'" do
         page_url = "/css/main.css"
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => "/base//"
+          "url"       => "http://example.com",
+          "base_path" => "/base//"
         )
         refute_equal "/base/css/main.css", filter.relative_url(page_url)
       end
 
-      should "not prepend a forward slash if both input and baseurl are simply '/'" do
+      should "not prepend a forward slash if both input and base_path are simply '/'" do
         page_url = "/"
         filter = make_filter_mock(
-          "url"     => "http://example.com",
-          "baseurl" => "/"
+          "url"       => "http://example.com",
+          "base_path" => "/"
         )
         assert_equal "/", filter.relative_url(page_url)
       end
 
       should "not return the url by reference" do
-        filter = make_filter_mock(baseurl: nil)
-        page = Page.new(filter.site, test_dir("fixtures"), "", "front_matter.erb")
-        assert_equal "/front_matter.html", page.url
+        filter = make_filter_mock(base_path: nil)
+        page = GeneratedPage.new(filter.site, test_dir("fixtures"), "", "front_matter.erb")
+        assert_equal "/front_matter/", page.url
         url = filter.relative_url(page.url)
         url << "foo"
-        assert_equal "/front_matter.html", page.url
-      end
-
-      should "transform the input baseurl to a string" do
-        page_url = "/my-page.html"
-        filter = make_filter_mock("baseurl" => Value.new(proc { "/baseurl/" }))
-        assert_equal "/baseurl#{page_url}", filter.relative_url(page_url)
+        assert_equal "/front_matter/", page.url
       end
 
       should "transform protocol-relative url" do
@@ -677,36 +856,75 @@ class TestFilters < BridgetownUnitTest
       should "convert drop to json" do
         @filter.site.read
         expected = {
-          "path"          => "_posts/2008-02-02-published.markdown",
-          "previous"      => nil,
           "output"        => nil,
-          "content"       => "This should be published.\n",
-          "id"            => "/publish-test/2008/02/02/published",
-          "url"           => "/publish-test/2008/02/02/published.html",
+          "id"            => "repo://posts.collection/_posts/2008-02-02-published.markdown",
+          "relative_url"  => "/base/publish_test/2008/02/02/published/",
+          "taxonomies"    => {
+            "category" => {
+              "type"  => {
+                "label"    => "category",
+                "key"      => "categories",
+                "metadata" => {
+                  "title" => "Category",
+                },
+              },
+              "terms" => [{
+                "label" => "publish_test",
+              }],
+            },
+            "tag"      => {
+              "type"  => {
+                "label"    => "tag",
+                "key"      => "tags",
+                "metadata" => {
+                  "title" => "Tag",
+                },
+              },
+              "terms" => [],
+            },
+          },
           "relative_path" => "_posts/2008-02-02-published.markdown",
+          "next"          => nil,
+          "date"          => "2008-02-02 00:00:00 +0000",
+          "summary"       => "This should be published.",
+          "data"          => {
+            "ruby3"      => "groovy",
+            "layout"     => "default",
+            "title"      => "Publish",
+            "category"   => "publish_test",
+            "categories" => [
+              "publish_test",
+            ],
+            "tags"       => [],
+            "locale"     => "en",
+            "date"       => "2008-02-02 00:00:00 +0000",
+            "slug"       => "published",
+          },
+          "absolute_url"  => "http://example.com/base/publish_test/2008/02/02/published/",
           "collection"    => "posts",
-          "excerpt"       => "<p>This should be published.</p>\n",
-          "categories"    => [
-            "publish_test",
-          ],
+          "content"       => "This should be published.\n",
           "ruby3"         => "groovy",
           "layout"        => "default",
           "title"         => "Publish",
           "category"      => "publish_test",
-          "date"          => "2008-02-02 00:00:00 +0000",
-          "slug"          => "published",
-          "ext"           => ".markdown",
+          "categories"    => ["publish_test"],
           "tags"          => [],
+          "locale"        => "en",
+          "slug"          => "published",
         }
-        actual = JSON.parse(@filter.jsonify(@filter.site.docs_to_write.first.to_liquid))
+        actual = JSON.parse(@filter.jsonify(@filter.site.resources_to_write.find do |post|
+          post.data.title == "Publish" && post.data.slug == "published"
+        end.to_liquid))
 
-        related_posts = actual.delete("related_posts")
-        assert related_posts.is_a?(Array), "doc.related_posts should be an array"
-
-        next_doc = actual.delete("next")
-        refute_nil next_doc
-        assert next_doc.is_a?(Hash), "doc.next should be an object"
-
+        actual.delete("path")
+        actual.delete("heres_a_liquid_method") # could be added in by accident through a plugin
+        prev = actual.delete("previous")
+        refute_nil prev
+        assert prev.is_a?(Hash), "doc.next should be an object"
+        relations = actual.delete("relations")
+        refute_nil relations
+        all_locales = actual.delete("all_locales")
+        assert all_locales.length == 1
         assert_equal expected, actual
       end
 
@@ -719,23 +937,6 @@ class TestFilters < BridgetownUnitTest
           "version"     => Bridgetown::VERSION,
         }
         assert_equal expected, JSON.parse(actual)["bridgetown"]
-      end
-
-      # rubocop:disable Style/StructInheritance
-      class M < Struct.new(:message)
-        def to_liquid
-          [message]
-        end
-      end
-      class T < Struct.new(:name)
-        def to_liquid
-          {
-            "name" => name,
-            :v     => 1,
-            :thing => M.new(kay: "jewelers"),
-            :stuff => true,
-          }
-        end
       end
 
       should "call #to_liquid " do
@@ -764,7 +965,6 @@ class TestFilters < BridgetownUnitTest
         result = @filter.jsonify([T.new("Jeremiah"), T.new("Smathers")])
         assert_equal expected, JSON.parse(result)
       end
-      # rubocop:enable Style/StructInheritance
 
       should "handle hashes with all sorts of weird keys and values" do
         my_hash = { "posts" => Array.new(3) { |i| T.new(i) } }
@@ -808,13 +1008,14 @@ class TestFilters < BridgetownUnitTest
     end
 
     context "group_by filter" do
-      should "successfully group array of Bridgetown::Page's" do
+      should "successfully group array of pages" do
         @filter.site.process
-        grouping = @filter.group_by(@filter.site.pages, "layout")
+        grouping = @filter.group_by(@filter.site.collections.pages.resources, "layout")
         grouping.each do |g|
           assert(
             ["default",
              "erblayout",
+             "serblayout",
              "example/test_layout",
              "example/overridden_layout",
              "nil",
@@ -839,13 +1040,13 @@ class TestFilters < BridgetownUnitTest
               g["items"].is_a?(Array),
               "The list of grouped items for '' is not an Array."
             )
-            assert_equal 17, g["items"].size
+            assert_equal 18, g["items"].size
           end
         end
       end
 
       should "include the size of each grouping" do
-        grouping = @filter.group_by(@filter.site.pages, "layout")
+        grouping = @filter.group_by(@filter.site.collections.pages.resources, "layout")
         grouping.each do |g|
           assert_equal(
             g["items"].size,
@@ -928,7 +1129,7 @@ class TestFilters < BridgetownUnitTest
         assert_equal [{ "tags" => nil }], @filter.where(hash, "tags", nil)
 
         assert_equal(
-          [{ "tags" => "" }, { "tags" => ["x", nil] }],
+          [{ "tags" => {} }, { "tags" => "" }, { "tags" => nil }, { "tags" => [] }],
           @filter.where(hash, "tags", "")
         )
 
@@ -1081,10 +1282,10 @@ class TestFilters < BridgetownUnitTest
 
       should "filter posts" do
         site = fixture_site.tap(&:read)
-        posts = site.site_payload["site"]["posts"]
-        results = @filter.where_exp(posts, "obj", "obj.title == 'Foo Bar'")
+        posts = site.site_payload["collections"]["posts"].resources
+        results = @filter.where_exp(posts, "obj", "obj.data.title == 'Foo Bar'")
         assert_equal 1, results.length
-        assert_equal site.posts.find { |p| p.title == "Foo Bar" }, results.first
+        assert_equal site.collections.posts.resources.find { |p| p.data.title == "Foo Bar" }, results.first
       end
 
       should "always return an array if the object responds to 'select'" do
@@ -1094,21 +1295,36 @@ class TestFilters < BridgetownUnitTest
 
       should "filter by variable values" do
         @filter.site.tap(&:read)
-        posts = @filter.site.site_payload["site"]["posts"]
+        posts = @filter.site.site_payload["collections"]["posts"].resources
         results = @filter.where_exp(posts, "post",
                                     "post.date > site.dont_show_posts_before")
         assert_equal posts.count { |p| p.date > @sample_time }, results.length
       end
     end
 
+    context "in_locale filter" do
+      should "filter by current site locale" do
+        filter = make_filter_mock(
+          available_locales: [:en, :es]
+        )
+        filter.site.read
+        posts = filter.site.site_payload["collections"]["posts"].resources
+        posts.first.data[:locale] = "es"
+        filter.site.locale = :es
+        results = filter.in_locale(posts)
+        assert_equal 1, results.length
+      end
+    end
+
     context "group_by_exp filter" do
       should "successfully group array of Bridgetown::Page's" do
         @filter.site.process
-        groups = @filter.group_by_exp(@filter.site.pages, "page", "page.layout | upcase")
+        groups = @filter.group_by_exp(@filter.site.collections.pages.resources, "page", "page.layout | upcase")
         groups.each do |g|
           assert(
             ["DEFAULT",
              "ERBLAYOUT",
+             "SERBLAYOUT",
              "EXAMPLE/TEST_LAYOUT",
              "EXAMPLE/OVERRIDDEN_LAYOUT",
              "NIL",
@@ -1133,13 +1349,13 @@ class TestFilters < BridgetownUnitTest
               g["items"].is_a?(Array),
               "The list of grouped items for '' is not an Array."
             )
-            assert_equal 17, g["items"].size
+            assert_equal 18, g["items"].size
           end
         end
       end
 
       should "include the size of each grouping" do
-        groups = @filter.group_by_exp(@filter.site.pages, "page", "page.layout")
+        groups = @filter.group_by_exp(@filter.site.collections.pages.resources, "page", "page.layout")
         groups.each do |g|
           assert_equal(
             g["items"].size,
@@ -1161,8 +1377,8 @@ class TestFilters < BridgetownUnitTest
       end
 
       should "be equivalent of group_by" do
-        actual = @filter.group_by_exp(@filter.site.pages, "page", "page.layout")
-        expected = @filter.group_by(@filter.site.pages, "layout")
+        actual = @filter.group_by_exp(@filter.site.collections.pages.resources, "page", "page.layout")
+        expected = @filter.group_by(@filter.site.collections.pages.resources, "layout")
 
         assert_equal expected, actual
       end
@@ -1273,8 +1489,11 @@ class TestFilters < BridgetownUnitTest
     end
 
     context "slugify filter" do
-      should "return a slugified string" do
+      should "return a slugified string with default mode" do
+        reset_mode = @filter.site.config.slugify_mode
+        @filter.site.config.slugify_mode = "default"
         assert_equal "q-bert-says", @filter.slugify(" Q*bert says @!#?@!")
+        @filter.site.config.slugify_mode = reset_mode
       end
 
       should "return a slugified string with mode" do

@@ -1,7 +1,7 @@
 ---
 title: Source Manifests
-hide_in_toc: true
 order: 0
+top_section: Configuration
 category: plugins
 ---
 
@@ -9,17 +9,17 @@ A gem-based plugin can optionally provide a Source Manifest which instructs
 Bridgetown how to load new content such as layouts, pages, static files, and
 Liquid components from folders in the gem.
 
-In the main Ruby code of your gem plugin (typically the root file of the `lib`
-folder), underneath your `require` statements, all you need to do is register a new
-source manifest with Bridgetown's plugin manager.
+All you need to do is register a new source manifest within your initializer.
 
 ```ruby
-Bridgetown::PluginManager.new_source_manifest(
-  origin: SamplePlugin,
-  components: File.expand_path("../components", __dir__),
-  content: File.expand_path("../content", __dir__),
-  layouts: File.expand_path("../layouts", __dir__)
-)
+Bridgetown.initializer :sample_plugin do |config|
+  config.source_manifest(
+    origin: SamplePlugin,
+    components: File.expand_path("../components", __dir__),
+    content: File.expand_path("../content", __dir__),
+    layouts: File.expand_path("../layouts", __dir__)
+  )
+end
 ```
 
 The `origin` keyword argument is required (it should be the root module of your gem),
@@ -50,8 +50,8 @@ need to do is use the [plugins command](/docs/commands/plugins) to access a
 folder in the gem and copy a namespaced subfolder over to the site. For example:
 
 ```sh
-$ bridgetown plugins cd AwesomePlugin/Layouts
-$ cp -r awesome_plugin $BRIDGETOWN_SITE/src/_layouts
+bridgetown plugins cd AwesomePlugin/Layouts
+cp -r awesome_plugin $BRIDGETOWN_SITE/src/_layouts
 ```
 
 The `awesome_plugin` folder would get copied over to the site's `_layouts` source
@@ -61,8 +61,8 @@ changes from there.
 ### Using Source Manifests to Create Themes
 
 Source manifest functionality, along with the ability to publish an NPM module
-with [frontend assets for Webpack](/docs/plugins/gems-and-webpack), plus the
-power of [automations](/docs/automations) to simply the setup process means
+with [frontend assets](/docs/plugins/gems-and-frontend), plus the
+power of [automations](/docs/automations) to simplify the setup process means
 that you can easily design and distribute themes for use by Bridgetown site
 owners.
 

@@ -11,13 +11,13 @@ module Bridgetown
 
     def read
       layout_entries.each do |layout_file|
-        @layouts[layout_name(layout_file)] = \
+        @layouts[layout_name(layout_file)] =
           Layout.new(site, layout_directory, layout_file)
       end
 
-      Bridgetown::PluginManager.source_manifests.map(&:layouts).compact.each do |plugin_layouts|
+      site.config.source_manifests.filter_map(&:layouts).each do |plugin_layouts|
         layout_entries(plugin_layouts).each do |layout_file|
-          @layouts[layout_name(layout_file)] ||= \
+          @layouts[layout_name(layout_file)] ||=
             Layout.new(site, plugin_layouts, layout_file, from_plugin: true)
         end
       end
@@ -44,13 +44,13 @@ module Bridgetown
     end
 
     def layout_name(file)
-      file.split(".")[0..-2].join(".")
+      Layout.label_for_file(file)
     end
 
-    def within(directory)
+    def within(directory, &block)
       return unless File.exist?(directory)
 
-      Dir.chdir(directory) { yield }
+      Dir.chdir(directory, &block)
     end
   end
 end

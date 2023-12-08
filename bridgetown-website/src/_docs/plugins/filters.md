@@ -1,11 +1,11 @@
 ---
 title: Filters
-hide_in_toc: true
 order: 0
+top_section: Configuration
 category: plugins
 ---
 
-Filters are simple Ruby methods you can provide to Liquid templates to transform input data in various ways. 
+Filters are simple Ruby methods you can provide to [Liquid templates](/docs/template-engines/liquid) to transform input data in various ways. 
 
 All methods take at least one argument which represents the input
 of the filter, and you can also support multiple method arguments (and even optional ones). The return value will be the output of the filter.
@@ -13,9 +13,9 @@ of the filter, and you can also support multiple method arguments (and even opti
 Example:
 
 ```ruby
-class Filters < SiteBuilder
+class Builders::Filters < SiteBuilder
   def build
-    liquid_filter "cache_busting_url" do |url|
+    liquid_filter :cache_busting_url do |url|
       "http://www.example.com/#{url}?#{Time.now.to_i}"
     end
   end
@@ -37,9 +37,9 @@ http://www.example.com/mydynamicfile.js?1586194585
 You can accept multiple arguments to your filter by simply adding them to your block or method, and optional ones are simply specified with a default value (perhaps `nil` or `false`). For example:
 
 ```ruby
-class Filters < SiteBuilder
+class Builders::Filters < SiteBuilder
   def build
-    liquid_filter "multiply_and_optionally_add" do |input, multiply_by, add_by = nil|
+    liquid_filter :multiply_and_optionally_add do |input, multiply_by, add_by = nil|
       value = input * multiply_by
       add_by ? value + add_by : value
     end
@@ -76,9 +76,9 @@ And of course you can chain any number of built-in and custom filters together:
 As with other parts of the Builder API, you can also use an instance method to register your filter:
 
 ```ruby
-class Filters < SiteBuilder
+class Builders::Filters < SiteBuilder
   def build
-    liquid_filter "cache_busting_url", :bust_it
+    liquid_filter :cache_busting_url, :bust_it
   end
 
   def bust_it(url)
@@ -87,10 +87,28 @@ class Filters < SiteBuilder
 end
 ```
 
+If your filter name and method name are the same, you can omit the second argument.
+
+## Filter Execution Scope
+
+The code within the filter block or method is executed within the scope of the builder object. This means you will need to use the `filters` method to call other filters.
+
+```ruby
+class Builders::Filters < SiteBuilder
+  def build
+    liquid_filter :slugify_and_upcase do |url|
+      filters.slugify(url).upcase
+    end
+  end
+end
+```
+
+You also have access to the Liquid context via `filters_context`, which provides current template objects such as the page (e.g., `filters_context.registers[:page]`).
+
 ## When to use a Filter vs. a Tag
 
 Filters are great when you want to transform input data from one format to another and potentially allow multiple transformations to be chained together. If instead you simply want to _insert_ a customized piece of content/HTML code into a page, then it's probably better to write a [Tag](/docs/plugins/tags/).
 
-{% rendercontent "docs/note", extra_margin: true %}
-If you prefer to use the Legacy API (aka `Liquid::Template.register_filter `) to construct Liquid filters, refer to the [Liquid documentation](https://github.com/Shopify/liquid/wiki/Liquid-for-Programmers) here.
-{% endrendercontent %}
+{%@ Note do %}
+  If you prefer to use the Legacy API (aka `Liquid::Template.register_filter `) to construct Liquid filters, refer to the [Liquid documentation](https://github.com/Shopify/liquid/wiki/Liquid-for-Programmers) here.
+{% end %}

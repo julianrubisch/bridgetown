@@ -1,14 +1,13 @@
 ---
-order: 6.5
-next_page_order: 7
+order: 230
 title: Automations
 top_section: Configuration
 category: automations
 ---
 
-**_New_** in Bridgetown 0.15: You can write automation scripts which act on new
-or existing sites to perform tasks such as adding gems, updating configuration,
-inserting code, copying files, and much more.
+You can write automation scripts which act on new or existing sites to perform
+tasks such as adding gems, updating configuration, inserting code, copying
+files, and much more.
 
 Automations are similar in concept to Gatsby Recipies or Rails App Templates.
 They're uniquely powerful when combined with [plugins](/docs/plugins), as an
@@ -19,13 +18,7 @@ apply that to a brand-new site to set everything up just how you want it in a
 repeatable and automatic fashion.
 
 Automations can be loaded from a local path, or they can be loaded from remote
-URLs including GitHub repositories and gists.
-
-{% rendercontent "docs/note", title: "Automations Galore!" %}
-For a directory of useful automations built by the Bridgetown community, check
-out the [Bridgetown Automations](https://github.com/bridgetownrb/automations)
-repo.
-{% endrendercontent %}
+URLs including GitHub repositories and gists. You can also run automation scripts [from within Rake tasks](/docs/command-line-usage#rakefile-and-rake-tasks).
 
 ## Running Automations
 
@@ -39,7 +32,7 @@ bridgetown new mysite --apply=/path/to/automation.rb
 For existing sites, you can use the `apply` command:
 
 ```sh
-bundle exec bridgetown apply /path/to/automation.rb
+bin/bridgetown apply /path/to/automation.rb
 ```
 
 If you don't supply any filename or URL to `apply`, it will look for
@@ -48,7 +41,7 @@ If you don't supply any filename or URL to `apply`, it will look for
 ```sh
 vim bridgetown.automation.rb # save an automation script
 
-bundle exec bridgetown apply
+bin/bridgetown apply
 ```
 
 Remote URLs to automation scripts are also supported, and GitHub repo or gist
@@ -56,14 +49,14 @@ URLs are automatically transformed to locate the right file from GitHub's CDN:
 
 ```sh
 # Install and configure the bridgetown-cloudinary gem
-bundle exec bridgetown apply https://github.com/bridgetownrb/bridgetown-cloudinary
+bin/bridgetown apply https://github.com/bridgetownrb/bridgetown-cloudinary
 ```
 
 You can also load a file other than `bridgetown.automation.rb` from GitHub:
 
 ```sh
 # Set up a default configuration for Netlify hosting
-bundle exec bridgetown apply https://github.com/bridgetownrb/automations/netlify.rb
+bin/bridgetown apply https://github.com/bridgetownrb/automations/netlify.rb
 ```
 
 ## Writing Automations
@@ -81,7 +74,7 @@ site repo:
 create_file "netlify.toml" do
   <<~NETLIFY
     [build]
-      command = "yarn deploy"
+      command = "bin/bridgetown deploy"
       publish = "output"
     [build.environment]
       NODE_VERSION = "12"

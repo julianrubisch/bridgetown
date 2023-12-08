@@ -3,32 +3,48 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "bundle exec bridgetown build",
-    "serve": "bundle exec bridgetown serve",
-    "clean": "bundle exec bridgetown clean",
+    <%- if frontend_bundling_option == "esbuild" -%>
+    "esbuild": "node esbuild.config.js --minify",
+    "esbuild-dev": "node esbuild.config.js --watch"
+    <%- else -%>
     "webpack-build": "webpack --mode production",
-    "webpack-dev": "webpack --mode development -w",
-    "deploy": "yarn clean && yarn webpack-build && yarn build",
-    "sync": "node sync.js",
-    "start": "node start.js"
+    "webpack-dev": "webpack --mode development -w"
+    <%- end -%>
   },
   "devDependencies": {
-    "@babel/core": "^7.9.0",
-    "@babel/plugin-proposal-class-properties": "^7.8.3",
-    "@babel/plugin-proposal-decorators": "^7.10.1",
-    "@babel/plugin-transform-runtime": "^7.9.0",
-    "@babel/preset-env": "^7.9.0",
-    "babel-loader": "^8.1.0",
-    "browser-sync": "^2.26.7",
-    "concurrently": "^5.2.0",
-    "css-loader": "^3.4.2",
-    "file-loader": "^6.0.0",
-    "mini-css-extract-plugin": "^0.9.0",
-    "node-sass": "^4.13.1",
-    "sass-loader": "^8.0.2",
-    "style-loader": "^1.1.3",
-    "webpack": "^4.42.1",
-    "webpack-cli": "^3.3.11",
-    "webpack-manifest-plugin": "^2.2.0"
+    <%- if frontend_bundling_option == "webpack" -%>
+    "css-loader": "^6.8.1",
+    <%- end -%>
+    "esbuild": "^0.19.2",
+    <%- if frontend_bundling_option == "webpack" -%>
+    "esbuild-loader": "^4.0.2",
+    "mini-css-extract-plugin": "^2.7.6",
+    <%- else -%>
+    "glob": "^10.3.3",
+    <%- end -%>
+    <%- unless disable_postcss? -%>
+    "postcss": "^8.4.29",
+    "postcss-flexbugs-fixes": "^5.0.2",
+    <%- if frontend_bundling_option == "esbuild" -%>
+    "postcss-import": "^15.1.0",
+    "postcss-load-config": "^4.0.1",
+    <%- else -%>
+    "postcss-loader": "^6.2.1",
+    <%- end -%>
+    "postcss-preset-env": "^9.1.2",
+    <%- if frontend_bundling_option == "esbuild" -%>
+    "read-cache": "^1.0.0"<%= "," unless postcss_option  %>
+    <%- end -%>
+    <%- end -%>
+    <%- unless postcss_option -%>
+    "sass": "^1.66.1",
+    "sass-loader": "^13.3.2"<%= "," if frontend_bundling_option == "webpack" %>
+    <%- end -%>
+    <%- if frontend_bundling_option == "webpack" -%>
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4",
+    "webpack-manifest-plugin": "^5.0.0",
+    "webpack-merge": "^5.9.0"
+    <%- end -%>
   }
 }

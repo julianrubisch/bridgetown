@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "open3"
 require "bridgetown-core"
 require "bridgetown-paginate"
 
@@ -32,10 +33,15 @@ class Paths
 
   def self.root_files
     [
-      ".bridgetown-webpack",
-      ".bridgetown-webpack/manifest.json",
+      ".bridgetown-cache",
+      ".bridgetown-cache/frontend-bundling",
+      ".bridgetown-cache/frontend-bundling/manifest.json",
       "bridgetown.config.yml",
+      "webpack.config.js",
+      "esbuild.config.js",
       "plugins",
+      "plugins/nested",
+      "plugins/nested/subnested",
       "frontend",
     ]
   end
@@ -53,13 +59,13 @@ def file_content_from_hash(input_hash)
               input_hash["content"]
             end
 
-  <<~EOF
+  <<~YAML
     ---
     #{matter}
     ---
 
     #{content}
-  EOF
+  YAML
 end
 
 #
@@ -99,19 +105,19 @@ end
 #
 
 def run_bundle(args)
-  run_in_shell("bundle", *args.strip.split(" "))
+  run_in_shell("bundle", *args.strip.split)
 end
 
 #
 
 def run_rubygem(args)
-  run_in_shell("gem", *args.strip.split(" "))
+  run_in_shell("gem", *args.strip.split)
 end
 
 #
 
 def run_bridgetown(args)
-  args = args.strip.split(" ") # Shellwords?
+  args = args.strip.split # Shellwords?
   process = run_in_shell("ruby", Paths.bridgetown_bin.to_s, *args, "--trace")
   process.exitstatus.zero?
 end
@@ -119,7 +125,7 @@ end
 #
 
 def run_in_shell(*args)
-  p, output = Bridgetown::Utils::Exec.run(*args)
+  p, output = exec_command(*args)
 
   File.write(Paths.status_file, p.exitstatus)
   File.open(Paths.output_file, "wb") do |f|
@@ -130,6 +136,15 @@ def run_in_shell(*args)
   end
 
   p
+end
+
+def exec_command(*args)
+  stdin, stdout, stderr, process = Open3.popen3(*args)
+  out = stdout.read.strip
+  err = stderr.read.strip
+
+  [stdin, stdout, stderr].each(&:close)
+  [process.value, out + err]
 end
 
 #
@@ -163,7 +178,7 @@ end
 #
 
 def seconds_agnostic_datetime(datetime = Time.now)
-  date, time, zone = datetime.to_s.split(" ")
+  date, time, zone = datetime.to_s.split
   time = seconds_agnostic_time(time)
 
   [

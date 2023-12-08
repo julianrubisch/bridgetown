@@ -4,17 +4,39 @@ module Bridgetown
   module Builders
     module DSL
       module Liquid
-        def liquid_filter(filter_name, method_name = nil, &block)
-          builder_self = self
+        def filters
+          @filters # could be nil
+        end
+
+        def filters_context
+          filters&.instance_variable_get(:@context)
+        end
+
+        def liquid_filter(filter_name, method_name = nil, filters_scope: false, &block)
           m = Module.new
 
-          if block
-            m.define_method filter_name do |*args|
-              builder_self.instance_exec(*args, &block)
-            end
-          elsif method_name
-            block = method(method_name)
+          if block && filters_scope
+            Deprecator.deprecation_message(
+              "The `filters_scope' functionality is deprecated. Use the `filters' builder " \
+              "method to access the filters scope in your plugin."
+            )
             m.define_method filter_name, &block
+          else
+            builder_self = self
+            method_name ||= filter_name unless block
+            unless method_name
+              method_name = :"__filter_#{filter_name}"
+              builder_self.define_singleton_method(method_name) do |*args, **kwargs|
+                block.(*args, **kwargs) # rubocop:disable Performance/RedundantBlockCall
+              end
+            end
+            m.define_method filter_name do |*args, **kwargs|
+              prev_var = builder_self.instance_variable_get(:@filters)
+              builder_self.instance_variable_set(:@filters, self)
+              builder_self.send(method_name, *args, **kwargs).tap do
+                builder_self.instance_variable_set(:@filters, prev_var)
+              end
+            end
           end
 
           ::Liquid::Template.register_filter(m)
@@ -23,7 +45,8 @@ module Bridgetown
         end
 
         def liquid_tag(tag_name, method_name = nil, as_block: false, &block)
-          block = method(method_name) if method_name.is_a?(Symbol)
+          method_name ||= tag_name unless block
+          block = method(method_name) if method_name
           local_name = name # pull the name method into a local variable
 
           tag_class = as_block ? ::Liquid::Block : ::Liquid::Tag
@@ -32,7 +55,7 @@ module Bridgetown
             define_singleton_method(:custom_name) { local_name }
 
             def inspect
-              "#{self.class.custom_name} (Liquid Tag)"
+              "#<#{self.class.custom_name} (Liquid Tag)>"
             end
 
             attr_reader :content, :context

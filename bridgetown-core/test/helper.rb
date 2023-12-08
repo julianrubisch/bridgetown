@@ -7,7 +7,7 @@ ENV["BRIDGETOWN_ENV"] = "test"
 if ENV["CI"]
   require "simplecov"
   SimpleCov.start
-else
+elsif !ENV["SKIP_COV"]
   require File.expand_path("simplecov_custom_profile", __dir__)
   SimpleCov.start "gem" do
     add_filter "/vendor/gem"
@@ -17,14 +17,15 @@ else
 end
 
 require "nokogiri"
+require "nokolexbor"
 require "rubygems"
 require "ostruct"
 require "minitest/autorun"
 require "minitest/reporters"
 require "minitest/profile"
 require "rspec/mocks"
-require_relative "../lib/bridgetown-core.rb"
-require_relative "../lib/bridgetown-core/commands/base.rb"
+require_relative "../lib/bridgetown-core"
+require_relative "../lib/bridgetown-core/commands/base"
 
 Bridgetown.logger = Logger.new(StringIO.new, :error)
 
@@ -33,9 +34,9 @@ require "shoulda"
 
 include Bridgetown
 
-require "bridgetown-core/commands/serve/servlet"
-
-# Report with color.
+# Report with color. ::DefaultReporter
+# Switch to Minitest::Reporters::SpecReporter if you want detailed
+# test output!
 Minitest::Reporters.use! [
   Minitest::Reporters::DefaultReporter.new(
     color: true
@@ -52,6 +53,20 @@ module Minitest::Assertions
     msg = message(msg) { "Expected '#{filename}' not to exist" }
     refute File.exist?(filename), msg
   end
+
+  def assert_file_contains(regex, filename)
+    assert_exist filename
+
+    file_contents = File.read(filename)
+    assert_match regex, file_contents
+  end
+
+  def refute_file_contains(regex, filename)
+    assert_exist filename
+
+    file_contents = File.read(filename)
+    refute_match regex, file_contents
+  end
 end
 
 module DirectoryHelpers
@@ -67,23 +82,16 @@ module DirectoryHelpers
     test_dir("source", *subdirs)
   end
 
+  def resources_root_dir(*subdirs)
+    test_dir("resources", *subdirs)
+  end
+
   def source_dir(*subdirs)
     test_dir("source", "src", *subdirs)
   end
 
   def test_dir(*subdirs)
     root_dir("test", *subdirs)
-  end
-
-  def temp_dir(*subdirs)
-    if Utils::Platforms.windows?
-      drive = Dir.pwd.sub(%r!^([^\/]+).*!, '\1')
-      temp_root = File.join(drive, "tmp")
-    else
-      temp_root = "/tmp"
-    end
-
-    File.join(temp_root, *subdirs)
   end
 end
 
@@ -99,8 +107,8 @@ class BridgetownUnitTest < Minitest::Test
   end
 
   def mocks_expect(*args)
-    RSpec::Mocks::ExampleMethods::ExpectHost.instance_method(:expect)\
-      .bind(self).call(*args)
+    RSpec::Mocks::ExampleMethods::ExpectHost.instance_method(:expect)
+      .bind_call(self, *args)
   end
 
   def before_setup
@@ -110,62 +118,52 @@ class BridgetownUnitTest < Minitest::Test
 
   def after_teardown
     super
+    # Uncomment for debugging purposes:
+    # unless self.class.instance_variable_get(:@already_torn)
+    #   self.class.instance_variable_set(:@already_torn, true)
+    #   puts self.class
+    # end
     RSpec::Mocks.verify
   ensure
     RSpec::Mocks.teardown
-  end
-
-  def fixture_document(relative_path)
-    site = fixture_site(
-      "collections" => {
-        "methods" => {
-          "output" => true,
-        },
-      }
-    )
-    site.read
-    matching_doc = site.collections["methods"].docs.find do |doc|
-      doc.relative_path == relative_path
-    end
-    [site, matching_doc]
   end
 
   def fixture_site(overrides = {})
     Bridgetown::Site.new(site_configuration(overrides))
   end
 
-  def default_configuration
-    Marshal.load(Marshal.dump(Bridgetown::Configuration::DEFAULTS))
+  def resources_site(overrides = {})
+    overrides["content_engine"] = "resource"
+    overrides["available_locales"] ||= %w[en fr]
+    overrides["plugins_dir"] = resources_root_dir("plugins")
+    new_config = site_configuration(overrides)
+    new_config.root_dir = resources_root_dir
+    new_config.source = resources_root_dir("src")
+    Bridgetown::Site.new new_config
   end
 
-  def build_configs(overrides, base_hash = default_configuration)
-    Utils.deep_merge_hashes(base_hash, overrides)
-  end
-
-  def load_plugin_content
-    unless @plugin_loaded
-      Bridgetown::PluginManager.new_source_manifest(
-        origin: self,
-        components: test_dir("plugin_content", "components"),
-        content: test_dir("plugin_content", "content"),
-        layouts: test_dir("plugin_content", "layouts")
-      )
-    end
-    @plugin_loaded ||= true
+  def load_plugin_content(config)
+    config.source_manifests << Bridgetown::Configuration::SourceManifest.new(
+      origin: self.class,
+      components: test_dir("plugin_content", "components"),
+      content: test_dir("plugin_content", "content"),
+      layouts: test_dir("plugin_content", "layouts")
+    )
   end
 
   def site_configuration(overrides = {})
-    load_plugin_content
+    Bridgetown.reset_configuration!
 
-    full_overrides = build_configs(overrides, build_configs(
-                                                "destination" => dest_dir,
-                                                "plugins_dir" => site_root_dir("plugins"),
-                                                "incremental" => false
-                                              ))
-    Configuration.from(full_overrides.merge(
-                         "root_dir" => site_root_dir,
-                         "source"   => source_dir
-                       ))
+    load_plugin_content(Bridgetown::Current.preloaded_configuration)
+
+    full_overrides = Utils.deep_merge_hashes({ "destination" => dest_dir,
+                                               "plugins_dir" => site_root_dir("plugins"), }, overrides)
+
+    Bridgetown.configuration(full_overrides.merge(
+                               "root_dir"          => site_root_dir,
+                               "source"            => source_dir,
+                               "skip_config_files" => true
+                             ))
   end
 
   def clear_dest
@@ -176,7 +174,7 @@ class BridgetownUnitTest < Minitest::Test
   def directory_with_contents(path)
     FileUtils.rm_rf(path)
     FileUtils.mkdir(path)
-    File.open("#{path}/index.html", "w") { |f| f.write("I was previously generated.") }
+    File.write("#{path}/index.html", "I was previously generated.")
   end
 
   def with_env(key, value)
@@ -206,13 +204,6 @@ class BridgetownUnitTest < Minitest::Test
     )
   end
 
-  def skip_if_windows(msg = nil)
-    if Utils::Platforms.really_windows?
-      msg ||= "Bridgetown does not currently support this feature on Windows."
-      skip msg.to_s.magenta
-    end
-  end
-
   def symlink_if_allowed(target, sym_file)
     FileUtils.ln_sf(target, sym_file)
   rescue Errno::EACCES
@@ -227,49 +218,17 @@ class FakeLogger
   def <<(str); end
 end
 
-module TestWEBrick
-  module_function
+# stub
+module Bridgetown
+  module Paginate
+    class PaginationIndexer
+      def self.index_documents_by(pages_list, search_term)
+        # site.collections[@configured_collection].resources
 
-  def mount_server(&block)
-    server = WEBrick::HTTPServer.new(config)
-
-    begin
-      server.mount("/", Bridgetown::Commands::Serve::Servlet, document_root,
-                   document_root_options)
-
-      server.start
-      addr = server.listeners[0].addr
-      block.yield([server, addr[3], addr[1]])
-    rescue StandardError => e
-      raise e
-    ensure
-      server.shutdown
-      sleep 0.1 until server.status == :Stop
+        pages_list.to_h do |resource|
+          [resource.data[search_term], nil]
+        end
+      end
     end
-  end
-
-  def config
-    logger = FakeLogger.new
-    {
-      BindAddress: "127.0.0.1", Port: 0,
-      ShutdownSocketWithoutClose: true,
-      ServerType: Thread,
-      Logger: WEBrick::Log.new(logger),
-      AccessLog: [[logger, ""]],
-      BridgetownOptions: {},
-    }
-  end
-
-  def document_root
-    "#{File.dirname(__FILE__)}/fixtures/webrick"
-  end
-
-  def document_root_options
-    WEBrick::Config::FileHandler.merge(
-      FancyIndexing: true,
-      NondisclosureName: [
-        ".ht*", "~*",
-      ]
-    )
   end
 end

@@ -28,7 +28,7 @@ module Bridgetown
       # drop.
       #
       # Returns nothing
-      def initialize(obj)
+      def initialize(obj) # rubocop:disable Lint/MissingSuper
         @obj = obj
       end
 
@@ -69,11 +69,11 @@ module Bridgetown
         if respond_to?(setter)
           public_send(setter, val)
         elsif respond_to?(key.to_s)
-          if self.class.mutable?
-            mutations[key] = val
-          else
+          unless self.class.mutable?
             raise Errors::DropMutationException, "Key #{key} cannot be set in the drop."
           end
+
+          mutations[key] = val
         else
           fallback_data[key] = val
         end
@@ -110,7 +110,7 @@ module Bridgetown
       # underlying data hashes and performs a set union to ensure a list
       # of unique keys for the Drop.
       #
-      # Returns an Array of unique keys for content for the Drop.
+      # @return [Array<String>]
       def keys
         (content_methods |
           mutations.keys |
@@ -184,7 +184,7 @@ module Bridgetown
           if block_given?
             self[key] = yield key, self[key], other[key]
           else
-            if Utils.mergable?(self[key]) && Utils.mergable?(other[key])
+            if Utils.mergeable?(self[key]) && Utils.mergeable?(other[key])
               self[key] = Utils.deep_merge_hashes(self[key], other[key])
               next
             end
@@ -202,7 +202,8 @@ module Bridgetown
         return self[key] if key?(key)
         raise KeyError, %(key not found: "#{key}") if default.nil? && block.nil?
         return yield(key) unless block.nil?
-        return default unless default.nil?
+
+        default unless default.nil?
       end
 
       private

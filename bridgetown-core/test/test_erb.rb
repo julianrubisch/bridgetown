@@ -5,8 +5,8 @@ require "helper"
 class TestERB < BridgetownUnitTest
   def setup
     @site = fixture_site
-    @site.process
-    @erb_page = @site.pages.find { |p| p[:title] == "I'm an ERB Page" }
+    @process_output = capture_output { @site.process }
+    @erb_page = @site.resources.find { |p| p.data[:title] == "I'm an ERB Page" }
   end
 
   context "ERB page" do
@@ -23,7 +23,7 @@ class TestERB < BridgetownUnitTest
     end
 
     should "allow Markdown content via a helper" do
-      assert_includes @erb_page.output, "<h2 id=\"im-a-header\">I&#8217;m a header!</h2>"
+      assert_includes @erb_page.output, "<h2 id=\"im-a-header\">I’m a header!</h2>"
       assert_includes @erb_page.output, "<li>Yay!</li>"
       assert_includes @erb_page.output, "<li>Nifty!</li>"
     end
@@ -37,20 +37,10 @@ class TestERB < BridgetownUnitTest
     end
   end
 
-  context "Ruby components" do
-    should "should render" do
-      assert_includes @erb_page.output, "Here's the page title! <strong>I'm an ERB Page</strong>"
-    end
-
-    should "allow source components to override plugin components" do
-      assert_includes @erb_page.output, "Yay, it got overridden!"
-    end
-  end
-
   context "ERB layout" do
     should "render layout vars" do
       assert_includes @erb_page.output, "Test? test"
-      assert_includes @erb_page.output, "<h1>I'm an ERB Page</h1>"
+      assert_includes @erb_page.output, "<h1>I&#39;m an ERB Page</h1>"
 
       assert_includes @erb_page.output, "<footer>#{@site.time} / #{Bridgetown::VERSION}</footer>"
     end
@@ -60,4 +50,36 @@ class TestERB < BridgetownUnitTest
       assert_includes @erb_page.output, "A partial success? YES!!"
     end
   end
+
+  context "capturing inside of component templates" do
+    should "not leak into main output" do
+      refute_includes @erb_page.output, "## You should not see this captured content."
+    end
+  end
+
+  context "Rails-style extensions" do
+    should "issue a warning" do
+      assert_includes @process_output, "Uh oh! You're using a Rails-style filename extension in:"
+      assert_includes @process_output, "rails-style.html.erb"
+    end
+  end
+
+  # rubocop:disable Layout/TrailingWhitespace
+  context "Declarative Shadow DOM" do
+    should "render via helpers" do
+      assert_includes @erb_page.output, <<~HTML
+        <dsd-component>
+          <template shadowrootmode="open">
+            <slot></slot>
+            <style>:host {
+          display: block;
+        }</style>
+        </template>  
+          <p>Default slot content.</p>
+        
+        </dsd-component>
+      HTML
+    end
+  end
+  # rubocop:enable Layout/TrailingWhitespace
 end

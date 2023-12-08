@@ -1,8 +1,7 @@
 ---
 title: Folder Structure
-order: 7
-next_page_order: 7.5
-top_section: Structure
+order: 70
+top_section: Writing Content
 category: structure
 ---
 
@@ -10,14 +9,16 @@ The typical folder structure for a Bridgetown site usually looks something like 
 
 ```shell
 .
-├── frontend # this is where you put your frontend assets for Webpack
+├── config # this is where frontend and server defaults are stored
+├── frontend # this is where you put your CSS and JS for esbuild/Webpack
 │   ├── javascript
 │   │   ├── index.js
 │   │   └── widget.js
 │   ├── styles
-│   │   ├── index.scss
-│   └   └── layout.scss
-├── src # this is where you put your content and design templates
+│   │   ├── index.css
+│   └   └── layout.css
+├── server # this is where you can (optionally) add API routes using Roda
+├── src # this is where you put your resources and design templates
 │   ├── _components
 │   │   ├── footer.liquid
 │   │   └── header.liquid
@@ -25,27 +26,29 @@ The typical folder structure for a Bridgetown site usually looks something like 
 │   │   ├── members.yml
 │   │   └── site_metadata.yml
 │   ├── _layouts
-│   │   ├── default.html
-│   │   └── post.html
+│   │   ├── default.erb
+│   │   └── post.serb
 │   ├── _posts
-│   │   ├── 2019-10-29-why-im-dressing-up-as-thanos-this-year.md
-│   │   └── 2020-04-12-isolation-is-really-getting-to-me.md
+│   │   ├── 2021-09-18-enjoying-the-celebration.md
+│   │   └── 2022-04-07-checking-out-bridgetown-now.md
 │   ├── images
 │   │   └── logo.svg
 │   ├── 404.html
 │   ├── some_page.md
 │   └── index.html # or index.md
-├── output # this is the generated site published via bridgetown build/serve
+├── output # this is the generated site after build process
 ├── plugins # this is where you can write custom plugins
 ├── bridgetown.config.yml # this is your Bridgetown configuration file
+├── config.ru # Puma uses this to boot up the web server
+├── esbuild.config.js # frontend bundler config
 ├── Gemfile
-├── package.json
-└── webpack.config.js
+├── Rakefile
+└── package.json
 ```
 {:.minimal-line-height}
 
 {:.note}
-The location of pages in your source folder structure will by default be mirrored in your output folder, whereas posts are handled in a special way. You can customize these <a href="/docs/structure/permalinks/">permalinks</a> via front matter and global configuration options.
+The location of pages in your source folder structure will by default be mirrored in your output folder, whereas posts are handled in a special way. You can customize these <a href="/docs/content/permalinks">permalinks</a> via front matter and global configuration options.
 
 ## Overview of Files & Folders
 
@@ -63,7 +66,7 @@ The location of pages in your source folder structure will by default be mirrore
       </td>
       <td>
         <p>
-          Liquid components (aka partials) which can be referenced by your layouts, posts, and pages to comprise a design system and facilitate template reuse. The tag <code>{% raw %}{% render "card" %}{% endraw %}</code> would insert the <code>_components/card.liquid</code> component.
+          A location for all your <a href="/docs/components">components</a> which can be referenced by your layouts and resources to comprise a design system and facilitate template reuse. In Liquid, <code>{% raw %}{% render "card" %}{% endraw %}</code> would insert the <code>_components/card.liquid</code> component. You can create Ruby components as well and save them here for use in Ruby layouts and resource files.
         </p>
       </td>
     </tr>
@@ -73,7 +76,7 @@ The location of pages in your source folder structure will by default be mirrore
       </td>
       <td>
         <p>
-          A place for well-formatted structured data. Bridgetown will autoload these files and they will then be accessible via <code>site.data</code>. For example, given <code>members.yml</code>, you can access the contents of that file via <code>site.data.members</code>. Supported formats are: <code>.yml/.yaml</code>, <code>.json</code>, <code>.csv</code>, and <code>.tsv</code>.
+          A place for well-formatted <a href="/docs/datafiles">structured data</a>. Bridgetown will autoload these files and they will then be accessible via <code>site.data</code>. For example, given <code>members.yml</code>, you can access the contents of that file via <code>site.data.members</code>. Supported formats are: <code>.yml/.yaml</code>, <code>.json</code>, <code>.csv</code>, <code>.tsv</code>, and <code>.rb</code>.
         </p>
       </td>
     </tr>
@@ -83,7 +86,7 @@ The location of pages in your source folder structure will by default be mirrore
       </td>
       <td>
         <p>
-          These are the templates that wrap posts, pages, and even other layouts. Layouts are chosen on a file-by-file basis via the <a href="/docs/front-matter/">front matter</a> (and you can configure default layouts for different document types or folder paths). The Liquid tag <code>{% raw %}{{ content }}{% endraw %}</code> is used to inject page content into the layout template.
+          These are the <a href="/docs/layouts">templates</a> that wrap resources and even other layouts. Layouts are chosen on a file-by-file basis via the <a href="/docs/front-matter/">front matter</a> (and you can configure default layouts for different collections or folder paths).
         </p>
       </td>
     </tr>
@@ -93,7 +96,7 @@ The location of pages in your source folder structure will by default be mirrore
       </td>
       <td>
         <p>
-          This is where you add dynamic blog-style content. The naming convention of these files is important, and must follow the <nobr>format: <code>YEAR-MONTH-DAY-post-title.EXT</code></nobr> (aka <code>.md</code>, <code>.html</code>, etc.). The <a href="/docs/structure/permalinks/">permalink</a> can be customized for each post. Posts are a built-in <a href="/docs/collections">collection</a>, and you can configure other collections in addition to (or even instead of) posts.
+          This is where you add dynamic blog-style content. The naming convention of these files is important, and must follow the format: <code>YEAR-MONTH-DAY-post-title.EXT</code> (aka <code>.md</code>, <code>.html</code>, etc.). The <a href="/docs/content/permalinks">permalink</a> can be customized for each post. Posts are a built-in <a href="/docs/collections">collection</a>, and you can configure other collections in addition to (or even instead of) posts.
         </p>
       </td>
     </tr>
@@ -103,7 +106,7 @@ The location of pages in your source folder structure will by default be mirrore
       </td>
       <td>
         <p>
-          You can save images here and reference them in both your markup and CSS (e.g. <code>/images/logo.svg</code>). The name of the <code>images</code> folder is completely arbitrary…feel free to rename it, relocate it under a parent `assets` folder, or however you'd like to set things up.
+          You can save images here and reference them in both your markup and CSS (e.g. <code>/images/logo.svg</code>). The name of the <code>images</code> folder is completely arbitrary…feel free to rename it or relocate it under a parent <code>assets</code> folder.
         </p>
       </td>
     </tr>
@@ -114,7 +117,7 @@ The location of pages in your source folder structure will by default be mirrore
       </td>
       <td>
         <p>
-          Provided that the file has a <a href="/docs/front-matter">front matter</a> section, it will be transformed by Bridgetown. You can create subfolders (and subfolders of subfolders) to organize your pages. You can also locate pages within <code>_pages</code> to line up with <code>_posts</code>, <code>_data</code>, etc.
+          Provided that the file has a <a href="/docs/front-matter">front matter</a> section, it will be transformed by Bridgetown as a <a href="/docs/resources">resource</a>. You can create subfolders (and subfolders of subfolders) to organize your pages. You can also locate pages within <code>_pages</code> to line up with <code>_posts</code>, <code>_data</code>, etc.
         </p>
       </td>
     </tr>
@@ -124,7 +127,17 @@ The location of pages in your source folder structure will by default be mirrore
       </td>
       <td>
         <p>
-          Every other directory and file except for those listed above—such as downloadable files, <code>favicon.ico</code>, <code>robots.txt</code>, and so forth—will be copied verbatim to the generated site as <a href="/docs/static_files">Static Files</a>.
+          Every other directory and file except for those listed above—such as downloadable files, <code>favicon.ico</code>, <code>robots.txt</code>, and so forth—will be copied verbatim to the generated site as <a href="/docs/static-files">Static Files</a>.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p class="default mt-0"><code>output</code></p>
+      </td>
+      <td>
+        <p>
+          This is where the generated site will be placed once Bridgetown is done transforming all the content.
         </p>
       </td>
     </tr>
@@ -145,21 +158,21 @@ The location of pages in your source folder structure will by default be mirrore
     </tr>
     <tr>
       <td>
-        <p class="default mt-0"><code>output</code></p>
+        <p class="default mt-0"><code>server</code></p>
       </td>
       <td>
         <p>
-          This is where the generated site will be placed once Bridgetown is done transforming it. It’s a good idea to add this to your <code>.gitignore</code> file.
+          This contains the base Roda appplication structure, used by Bridgetown to faciliate both the static files server and <a href="/docs/routes">SSR/dynamic routes (if present)</a>.
         </p>
       </td>
     </tr>
     <tr>
       <td>
-        <p class="default mt-0"><code>.bridgetown-metadata</code><br/><code>.bridgetown-cache</code></p>
+        <p class="default mt-0"><code>.bridgetown-cache</code></p>
       </td>
       <td>
         <p>
-          <code>.bridgetown-metadata</code> helps Bridgetown keep track of which files have not been modified since the site was last built and which files will need to be regenerated on the next build. <code>.bridgetown-cache</code> is used to improve performance over multiple builds. It’s a good idea to add these to your <code>.gitignore</code> file.
+          <code>.bridgetown-cache</code> is used to improve performance over multiple builds by storing the results of expensive operations.
         </p>
       </td>
     </tr>
@@ -185,21 +198,21 @@ The location of pages in your source folder structure will by default be mirrore
     </tr>
     <tr>
       <td>
-        <p class="default mt-0"><code>package.json</code><br/><code>start.js</code><br/><code>sync.js</code></p>
+        <p class="default mt-0"><code>package.json</code></p>
       </td>
       <td>
         <p>
-          Manifest used by Yarn to install frontend assets and set up commands you can run to compile your Javascript, CSS, etc. via Webpack—as well as perform other tasks. Typically there are a couple scripts that are used to load the live-reload Browsersync server and run the Bridgetown and Webpack watchers simultaneously.
+          Manifest used by Yarn to install frontend assets and set up commands you can run to compile your JavaScript, CSS, etc. via esbuild/Webpack.
         </p>
       </td>
     </tr>
     <tr>
       <td>
-        <p class="default mt-0"><code>webpack.config.js</code></p>
+        <p class="default mt-0"><code>esbuild.config.js</code></p>
       </td>
       <td>
         <p>
-          Configuration file used by Webpack to compile frontend assets and save them to the output folder alongside your Bridgetown content.
+          Configuration file used by esbuild to compile frontend assets and save them to the output folder alongside your Bridgetown content.
         </p>
       </td>
     </tr>

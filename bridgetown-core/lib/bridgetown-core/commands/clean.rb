@@ -17,16 +17,16 @@ module Bridgetown
       summary "Clean the site (removes site output and metadata file) without building"
 
       def clean
-        config = configuration_with_overrides(options)
+        config = configuration_with_overrides(options, Bridgetown::Current.preloaded_configuration)
         destination = config["destination"]
         metadata_file = File.join(config["root_dir"], ".bridgetown-metadata")
         cache_dir = File.join(config["root_dir"], config["cache_dir"])
-        webpack_dir = File.join(config["root_dir"], ".bridgetown-webpack")
+        bundling_dir = File.join(config["root_dir"], ".bridgetown-cache", "frontend-bundling")
 
         remove(destination, checker_func: :directory?)
         remove(metadata_file, checker_func: :file?)
         remove(cache_dir, checker_func: :directory?)
-        remove(webpack_dir, checker_func: :directory?)
+        remove(bundling_dir, checker_func: :directory?)
       end
 
       protected

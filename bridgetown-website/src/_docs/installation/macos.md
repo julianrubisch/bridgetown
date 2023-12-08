@@ -1,8 +1,9 @@
 ---
 title: Bridgetown on macOS
-hide_in_toc: true
-category: installation
-ruby_version: 2.6.6
+top_section: Setup
+category: installation-guides
+back_to: installation
+ruby_version: 3.0.2
 order: 0
 ---
 
@@ -15,7 +16,7 @@ Ruby versions, which comes in handy when you need to run a specific Ruby version
 
 ```sh
 # Install Homebrew
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Install rbenv and ruby-build
 brew install rbenv
@@ -26,19 +27,19 @@ rbenv init
 
 Restart your terminal for changes to take effect.
 
-Now you can install a new Ruby version. At the time of this writing, Ruby 2.6.6 is a fast and stable option. You'll also want to install Bundler to manage Rubygem dependencies.
+Now you can install a new Ruby version. At the time of this writing, Ruby {{ resource.data.ruby_version }} is the latest stable version. (Note: the installation may take a few minutes to complete.)
 
 ```sh
-rbenv install {{ page.ruby_version }}
-rbenv global {{ page.ruby_version }}
+rbenv install {{ resource.data.ruby_version }}
+rbenv global {{ resource.data.ruby_version }}
 
 ruby -v
-> ruby 2.6.6p146 (2020-03-31 revision 67876) [x86_64-darwin19]
-
-gem install bundler -N
+> ruby 3.0.2p107 (2021-07-07 revision 0db68f0233) [arm64-darwin20]
 ```
 
-And that's it! Head over [rbenv command references](https://github.com/rbenv/rbenv#command-reference) to learn how to use different versions of Ruby in your projects.
+(If for some reason `bundler` isn't installed automatically, just run `gem install bundler -N`)
+
+And that's it! Check out [rbenv command references](https://github.com/rbenv/rbenv#command-reference) to learn how to use different versions of Ruby in your projects.
 
 Now jump down to the [Install Node & Yarn](#node) section.
 
@@ -48,7 +49,7 @@ You may install Ruby directly through [Homebrew](https://brew.sh).
 
 ```sh
 # Install Homebrew
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 brew install ruby
 ```
@@ -56,7 +57,7 @@ brew install ruby
 Add the brew ruby path to your shell config:
 
 ```sh
-echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >> ~/.bash_profile
+echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >> ~/.zprofile
 ```
 
 Then relaunch your terminal and check your updated Ruby setup:
@@ -79,7 +80,7 @@ gem install --user-install bundler
 Then append your path file with the following, replacing the `X.X` with the first two digits of your Ruby version.
 
 ```sh
-echo 'export PATH="$HOME/.gem/ruby/X.X.0/bin:$PATH"' >> ~/.bash_profile
+echo 'export PATH="$HOME/.gem/ruby/X.X.0/bin:$PATH"' >> ~/.zprofile
 ```
 
 Then relaunch your terminal and check that your gem paths point to your home directory by running:
@@ -90,19 +91,17 @@ gem env
 
 And check that `SHELL PATH:` includes to a path to `~/.gem/ruby/X.X.0/bin`
 
-{% rendercontent "docs/note" %}
+{%@ Note do %}
 Every time you update Ruby to a version with a different first two digits, you will need to update your path to match.
 
 You will also need to add `--user-install` to any `gem install` statement you run.
-{% endrendercontent %}
+{% end %}
 
 ## Install Node & Yarn {#node}
 
-Node is a Javascript runtime that can execute on a server or development machine. Yarn
+Node is a JavaScript runtime that can execute on a server or development machine. Yarn
 is a package manager for Node packages. You'll need Node and Yarn in order to install
-and use Webpack, the frontend asset compiler that runs alongside Bridgetown. Yarn is
-also used along with Concurrently and Browsersync to spin up a live-reload development
-server.
+and use Webpack, the frontend asset compiler that runs alongside Bridgetown.
 
 The easiest way to install Node and Yarn is via Homebrew (which should already be installed after following the instructions above).
 
@@ -119,6 +118,4 @@ node -v
 yarn -v
 ```
 
-{% render "docs/install/bridgetown" %}
-
-{% render "docs/install/concurrently" %}
+{%@ "docs/install/bridgetown" %}

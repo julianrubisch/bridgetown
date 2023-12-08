@@ -140,8 +140,8 @@ Feature: Site configuration
     And the "output/foo.txt" file should not exist
     And the "output/index.html" file should not exist
     And the "output/.htaccess" file should not exist
-    But the "output/about.html" file should exist
-    And I should see "John Doe" in "output/about.html"
+    But the "output/about/index.html" file should exist
+    And I should see "John Doe" in "output/about/index.html"
 
   Scenario: Use Kramdown for markup
     Given I have an "index.markdown" page that contains "[Google](https://www.google.com)"
@@ -153,25 +153,15 @@ Feature: Site configuration
 
   Scenario: Highlight code with rouge
     Given I have an "index.html" page that contains "{% highlight ruby %} puts 'Hello world!' {% endhighlight %}"
-    And I have a configuration file with "highlighter" set to "rouge"
     When I run bridgetown build
     Then I should get a zero exit status
     And the output directory should exist
     And I should see "Hello world!" in "output/index.html"
     And I should see "class=\"highlight\"" in "output/index.html"
 
-  Scenario: Rouge renders code block once
-    Given I have a configuration file with "highlighter" set to "rouge"
-    And I have a _posts directory
-    And I have the following post:
-      | title | date             | layout  | content                                      |
-      | foo   | 2014-04-27 11:34 | default | {% highlight text %} test {% endhighlight %} |
-    When I run bridgetown build
-    Then I should not see "highlight(.*)highlight" in "output/2014/04/27/foo.html"
-
   Scenario: Set time and no future dated posts
     Given I have a _layouts directory
-    And I have a page layout that contains "Page Layout: {{ site.posts.size }} on {{ site.time | date: "%Y-%m-%d" }}"
+    And I have a page layout that contains "Page Layout: {{ collections.posts.resources.size }} on {{ site.time | date: "%Y-%m-%d" }}"
     And I have a post layout that contains "Post Layout: {{ content }}"
     And I have an "index.html" page with layout "page" that contains "site index page"
     And I have a configuration file with:
@@ -187,12 +177,12 @@ Feature: Site configuration
     Then I should get a zero exit status
     And the output directory should exist
     And I should see "Page Layout: 1 on 2010-01-01" in "output/index.html"
-    And I should see "Post Layout: <p>content for entry1.</p>" in "output/2007/12/31/entry1.html"
-    And the "output/2020/01/31/entry2.html" file should not exist
+    And I should see "Post Layout: <p>content for entry1.</p>" in "output/2007/12/31/entry1/index.html"
+    And the "output/2020/01/31/entry2/index.html" file should not exist
 
   Scenario: Set time and future dated posts allowed
     Given I have a _layouts directory
-    And I have a page layout that contains "Page Layout: {{ site.posts.size }} on {{ site.time | date: "%Y-%m-%d" }}"
+    And I have a page layout that contains "Page Layout: {{ collections.posts.resources.size }} on {{ site.time | date: "%Y-%m-%d" }}"
     And I have a post layout that contains "Post Layout: {{ content }}"
     And I have an "index.html" page with layout "page" that contains "site index page"
     And I have a configuration file with:
@@ -208,12 +198,12 @@ Feature: Site configuration
     Then I should get a zero exit status
     And the output directory should exist
     And I should see "Page Layout: 2 on 2010-01-01" in "output/index.html"
-    And I should see "Post Layout: <p>content for entry1.</p>" in "output/2007/12/31/entry1.html"
-    And I should see "Post Layout: <p>content for entry2.</p>" in "output/2020/01/31/entry2.html"
+    And I should see "Post Layout: <p>content for entry1.</p>" in "output/2007/12/31/entry1/index.html"
+    And I should see "Post Layout: <p>content for entry2.</p>" in "output/2020/01/31/entry2/index.html"
 
     Scenario: Generate proper dates with explicitly set timezone (same as posts' time)
       Given I have a _layouts directory
-      And I have a page layout that contains "Page Layout: {{ site.posts.size }}"
+      And I have a page layout that contains "Page Layout: {{ collections.posts.resources.size }}"
       And I have a post layout that contains "Post Layout: {{ content }} built at {{ page.date | date_to_xmlschema }}"
       And I have an "index.html" page with layout "page" that contains "site index page"
       And I have a configuration file with:
@@ -228,16 +218,15 @@ Feature: Site configuration
       Then I should get a zero exit status
       And the output directory should exist
       And I should see "Page Layout: 2" in "output/index.html"
-      And I should see "Post Layout: <p>content for entry1.</p>\n built at" in "output/2013/04/09/entry1.html"
-      And I should see "Post Layout: <p>content for entry2.</p>\n built at" in "output/2013/04/10/entry2.html"
-      And I should see date "2013-04-09T23:22:00-04:00" in "output/2013/04/09/entry1.html" unless Windows
-      And I should see date "2013-04-09T22:22:00-05:00" in "output/2013/04/09/entry1.html" if on Windows
-      And I should see date "2013-04-10T03:14:00-04:00" in "output/2013/04/10/entry2.html" unless Windows
-      And I should see date "2013-04-10T02:14:00-05:00" in "output/2013/04/10/entry2.html" if on Windows
+      And I should see "Post Layout: <p>content for entry1.</p>\n built at" in "output/2013/04/09/entry1/index.html"
+      And I should see "Post Layout: <p>content for entry2.</p>\n built at" in "output/2013/04/10/entry2/index.html"
+      And I should see "2013-04-09T23:22:00-04:00" in "output/2013/04/09/entry1/index.html"
+      And I should see "2013-04-10T03:14:00-04:00" in "output/2013/04/10/entry2/index.html"
 
+    # TODO: this behavior has changed, pre-resource engine it would have output both under 2013/04/09
     Scenario: Generate proper dates with explicitly set timezone (different than posts' time)
       Given I have a _layouts directory
-      And I have a page layout that contains "Page Layout: {{ site.posts.size }}"
+      And I have a page layout that contains "Page Layout: {{ collections.posts.resources.size }}"
       And I have a post layout that contains "Post Layout: {{ content }} built at {{ page.date | date_to_xmlschema }}"
       And I have an "index.html" page with layout "page" that contains "site index page"
       And I have a configuration file with:
@@ -252,27 +241,10 @@ Feature: Site configuration
       Then I should get a zero exit status
     And the output directory should exist
       And I should see "Page Layout: 2" in "output/index.html"
-      And the "output/2013/04/09/entry1.html" file should exist
-      And the "output/2013/04/09/entry2.html" file should exist
-      And I should see "Post Layout: <p>content for entry1.</p>\n built at 2013-04-09T09:22:00-10:00" in "output/2013/04/09/entry1.html"
-      And I should see "Post Layout: <p>content for entry2.</p>\n built at 2013-04-09T13:14:00-10:00" in "output/2013/04/09/entry2.html"
-
-  Scenario: Limit the number of posts generated by most recent date
-    Given I have a _posts directory
-    And I have a configuration file with:
-      | key         | value       |
-      | limit_posts | 2           |
-    And I have the following posts:
-      | title   | date       | content                  |
-      | Apples  | 2009-03-27 | An article about apples  |
-      | Oranges | 2009-04-01 | An article about oranges |
-      | Bananas | 2009-04-05 | An article about bananas |
-    When I run bridgetown build
-    Then I should get a zero exit status
-    And the output directory should exist
-    And the "output/2009/04/05/bananas.html" file should exist
-    And the "output/2009/04/01/oranges.html" file should exist
-    And the "output/2009/03/27/apples.html" file should not exist
+      And the "output/2013/04/09/entry1/index.html" file should exist
+      And the "output/2013/04/10/entry2/index.html" file should exist
+      And I should see "Post Layout: <p>content for entry1.</p>\n built at 2013-04-09T09:22:00-10:00" in "output/2013/04/09/entry1/index.html"
+      And I should see "Post Layout: <p>content for entry2.</p>\n built at 2013-04-09T13:14:00-10:00" in "output/2013/04/10/entry2/index.html"
 
   Scenario: arbitrary file reads via layouts
     Given I have an "index.html" page with layout "page" that contains "FOO"
@@ -283,16 +255,62 @@ Feature: Site configuration
     And I should see "FOO" in "output/index.html"
     And I should not see " " in "output/index.html"
 
-  Scenario: Opt-out of slugified categories
-    Given I have a _posts directory
-    And I have the following post:
-      | title     | date       | category    | content                 |
-      | Star Wars | 2009-03-27 | Big Reveals | Luke, I am your father. |
-    And I have a configuration file with:
-      | key                | value  |
-      | slugify_categories | false  |
-      | permalink          | simple |
+  Scenario: Allow collapsed Zeitwerk dirs with specific dir name
+    Given I have a "plugins/nested" directory
+    And I have a "plugins/nested/top_level.rb" file with content:
+    """
+    module TopLevel
+      Bridgetown::Hooks.register :site, :after_reset do |site|
+        pg = Bridgetown::GeneratedPage.new(site, site.source, "/", "foo.html")
+        pg.content = "Zeitwerk specific dir"
+
+        site.generated_pages << pg
+      end
+    end
+    """
+    And I have a "bridgetown.config.yml" file with content:
+    """
+    autoloader_collapsed_paths:
+    - plugins/nested
+    """
     When I run bridgetown build
     Then I should get a zero exit status
     And the output directory should exist
-    And I should see "I am your father" in "output/big reveals/star-wars/index.html"
+    And I should see "Zeitwerk specific dir" in "output/foo/index.html"
+
+  Scenario: Allow collapsed Zeitwerk dirs using globs
+    Given I have a "plugins/nested" directory
+    And I have a "plugins/nested/subnested" directory
+    And I have a "plugins/nested/top_level.rb" file with content:
+    """
+    module TopLevel
+      Bridgetown::Hooks.register :site, :after_reset do |site|
+        pg = Bridgetown::GeneratedPage.new(site, site.source, "/", "foo.html")
+        pg.content = "Zeitwerk glob dir"
+
+        site.generated_pages << pg
+      end
+    end
+    """
+    And I have a "plugins/nested/subnested/lower_level.rb" file with content:
+    """
+    module Subnested::LowerLevel
+      Bridgetown::Hooks.register :site, :after_reset do |site|
+        pg = Bridgetown::GeneratedPage.new(site, site.source, "/", "bar.html")
+        pg.content = "Zeitwerk glob subnested dir"
+
+        site.generated_pages << pg
+      end
+    end
+    """
+    And I have a "bridgetown.config.yml" file with content:
+    """
+    autoloader_collapsed_paths:
+    - plugins/*
+    """
+    When I run bridgetown build
+    Then I should get a zero exit status
+    And the output directory should exist
+    And I should see "Zeitwerk glob dir" in "output/foo/index.html"
+    And I should see "Zeitwerk glob subnested dir" in "output/bar/index.html"
+

@@ -14,8 +14,8 @@ Feature: Template Engines
       | template_engine | erb   |
     When I run bridgetown build
     Then I should get a zero exit status
-    And I should see "<p><em>Luke</em>, I am your father.</p>" in "output/2009/03/27/star-wars.html"
-    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars.html"
+    And I should see "<p><em>Luke</em>, I am your father.</p>" in "output/2009/03/27/star-wars/index.html"
+    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars/index.html"
 
   Scenario: Rendering a site with default ERB but Liquid layout
     Given I have a _layouts directory
@@ -29,8 +29,8 @@ Feature: Template Engines
       | template_engine | erb   |
     When I run bridgetown build
     Then I should get a zero exit status
-    And I should see "<p>Luke, I am your father.</p>" in "output/2009/03/27/star-wars.html"
-    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars.html"
+    And I should see "<p>Luke, I am your father.</p>" in "output/2009/03/27/star-wars/index.html"
+    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars/index.html"
 
   Scenario: Rendering a site with default ERB but Liquid page
     Given I have a _layouts directory
@@ -49,8 +49,8 @@ Feature: Template Engines
       | template_engine | erb   |
     When I run bridgetown build
     Then I should get a zero exit status
-    And I should see "Luke, I am your <%= 'father'.upcase %>." in "output/liquidpage.html"
-    And I should see "<h1>Star Wars</h1>" in "output/liquidpage.html"
+    And I should see "Luke, I am your <%= 'father'.upcase %>." in "output/liquidpage/index.html"
+    And I should see "<h1>Star Wars</h1>" in "output/liquidpage/index.html"
 
   Scenario: Rendering a site with default ERB but Liquid layout via front matter
     Given I have a _layouts directory
@@ -70,8 +70,8 @@ Feature: Template Engines
       | template_engine | erb   |
     When I run bridgetown build
     Then I should get a zero exit status
-    And I should see "<p>Luke, I am your father.</p>" in "output/2009/03/27/star-wars.html"
-    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars.html"
+    And I should see "<p>Luke, I am your father.</p>" in "output/2009/03/27/star-wars/index.html"
+    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars/index.html"
 
   Scenario: Rendering a site with default Liquid but ERB template via front matter
     Given I have a _layouts directory
@@ -82,15 +82,15 @@ Feature: Template Engines
       | Star Wars | 2009-03-27 | simple | erb             | Luke, <%= ["I", "am"].join(" ") %> your father. |
     When I run bridgetown build
     Then I should get a zero exit status
-    And I should see "<p>Luke, I am your father.</p>" in "output/2009/03/27/star-wars.html"
-    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars.html"
+    And I should see "<p>Luke, I am your father.</p>" in "output/2009/03/27/star-wars/index.html"
+    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars/index.html"
 
   Scenario: Rendering an ERB file with custom extension
     Given I have a "data.json" file with content:
       """
       ---
       ---
-      <%= jsonify({key: [1, 1+1, 1+1+1]}) %>
+      <%= raw jsonify({key: [1, 1+1, 1+1+1]}) %>
       """
     And I have a configuration file with:
       | key             | value |
@@ -112,7 +112,50 @@ Feature: Template Engines
       | template_engine | erb   |
     When I run bridgetown build
     Then I should get a zero exit status
-    And I should see "<p><em>Luke</em>, &lt;%= " in "output/2009/03/27/star-wars.html"
-    And I should see ".join" in "output/2009/03/27/star-wars.html"
-    And I should see " %&gt; your father.</p>" in "output/2009/03/27/star-wars.html"
-    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars.html"
+    And I should see "<p><em>Luke</em>, &lt;%= " in "output/2009/03/27/star-wars/index.html"
+    And I should see ".join" in "output/2009/03/27/star-wars/index.html"
+    And I should see " %&gt; your father.</p>" in "output/2009/03/27/star-wars/index.html"
+    And I should see "<h1>Star Wars</h1>" in "output/2009/03/27/star-wars/index.html"
+
+  Scenario: Rendering slotted content
+    Given I have a _layouts directory
+    And I have a _posts directory
+    And I have a "_layouts/simple.html" file that contains "<h1><%= page.data.title %> <%= slotted :subtitle, "[BLANK]" %></h1> <%= yield %>"
+    And I have the following post:
+      | title     | date       | layout | content                                           |
+      | Star Wars | 2009-03-27 | simple | _Luke_, <%= ["I", "am"].join(" ") %> your father<% slot :subtitle, "V: ", transform: false %><% slot :subtitle, "The Empire Strikes Back", transform: false %>. |
+    And I have a configuration file with:
+      | key             | value |
+      | template_engine | erb   |
+    When I run bridgetown build
+    Then I should get a zero exit status
+    And I should see "<p><em>Luke</em>, I am your father.</p>" in "output/2009/03/27/star-wars/index.html"
+    And I should see "<h1>Star Wars V: The Empire Strikes Back</h1>" in "output/2009/03/27/star-wars/index.html"
+
+  Scenario: Rendering default slotted content
+    Given I have a _layouts directory
+    And I have a _posts directory
+    And I have a "_layouts/simple.html" file that contains "<h1><%= data.title %>: <%= slotted :subtitle, "[BLANK]" %></h1> <%= yield %>"
+    And I have the following post:
+      | title     | date       | layout | content                                           |
+      | Star Wars | 2009-03-27 | simple | What a piece of junk! |
+    And I have a configuration file with:
+      | key             | value |
+      | template_engine | erb   |
+    When I run bridgetown build
+    Then I should get a zero exit status
+    And I should see "<h1>Star Wars: \[BLANK\]</h1>" in "output/2009/03/27/star-wars/index.html"
+
+  Scenario: Replacing slotted content
+    Given I have a _layouts directory
+    And I have a _posts directory
+    And I have a "_layouts/simple.html" file that contains "<%= slotted :title, "[BLANK]" %> <%= yield %>"
+    And I have the following post:
+      | title     | date       | layout | content                                           |
+      | Star Wars | 2009-03-27 | simple | <% slot "title" do %># Star Trek<% end %><% slot "title", replace: true do %> # Star Wars<% end %> |
+    And I have a configuration file with:
+      | key             | value |
+      | template_engine | erb   |
+    When I run bridgetown build
+    Then I should get a zero exit status
+    And I should see "<h1 id=\"star-wars\">Star Wars</h1>" in "output/2009/03/27/star-wars/index.html"

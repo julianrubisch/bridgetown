@@ -21,8 +21,8 @@ module Bridgetown
                            desc: "Destination directory (defaults to output)"
         klass.class_option :root_dir,
                            aliases: "-r",
-                           desc: "The top-level root folder" \
-                                 " where config files are located"
+                           desc: "The top-level root folder " \
+                                 "where config files are located"
         klass.class_option :plugins_dir,
                            aliases: "-p",
                            type: :array,
@@ -33,18 +33,15 @@ module Bridgetown
         klass.class_option :future,
                            type: :boolean,
                            desc: "Publishes posts with a future date"
-        klass.class_option :limit_posts,
-                           type: :numeric,
-                           desc: "Limits the number of posts to parse and publish"
-        klass.class_option :baseurl,
+        klass.class_option :url,
+                           aliases: "-u",
+                           desc: "Override the configured url for the website"
+        klass.class_option :base_path,
                            aliases: "-b",
-                           desc: "Serve the website from the given base URL"
+                           desc: "Serve the website from the given base path"
         klass.class_option :force_polling,
                            type: :boolean,
                            desc: "Force watch to use polling"
-        klass.class_option :lsi,
-                           type: :boolean,
-                           desc: "Use LSI for improved related posts"
         klass.class_option :unpublished,
                            type: :boolean,
                            aliases: "-U",
@@ -63,10 +60,6 @@ module Bridgetown
                            aliases: "-V",
                            type: :boolean,
                            desc: "Print verbose output."
-        klass.class_option :incremental,
-                           aliases: "-I",
-                           type: :boolean,
-                           desc: "Enable incremental rebuild."
         klass.class_option :strict_front_matter,
                            type: :boolean,
                            desc: "Fail if errors are present in front matter"

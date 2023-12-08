@@ -14,10 +14,7 @@ module Bridgetown
 
       def initialize(tag_name, markup, tokens)
         super
-        if markup.strip =~ SYNTAX
-          @lang = Regexp.last_match(1).downcase
-          @highlight_options = parse_options(Regexp.last_match(2))
-        else
+        unless markup.strip =~ SYNTAX
           raise SyntaxError, <<~MSG
             Syntax Error in tag 'highlight' while parsing the following markup:
 
@@ -26,6 +23,9 @@ module Bridgetown
             Valid syntax: highlight <lang> [linenos]
           MSG
         end
+
+        @lang = Regexp.last_match(1).downcase
+        @highlight_options = parse_options(Regexp.last_match(2))
       end
 
       LEADING_OR_TRAILING_LINE_TERMINATORS = %r!\A(\n|\r)+|(\n|\r)+\z!.freeze
@@ -36,13 +36,11 @@ module Bridgetown
         code = super.to_s.gsub(LEADING_OR_TRAILING_LINE_TERMINATORS, "")
 
         output =
-          case context.registers[:site].highlighter
+          case context.registers[:site].config.highlighter
           when "rouge"
             render_rouge(code)
-          when "pygments"
-            render_pygments(code, context)
           else
-            render_codehighlighter(code)
+            h(code).strip
           end
 
         rendered_output = add_code_tag(output)
@@ -72,13 +70,6 @@ module Bridgetown
         options
       end
 
-      def render_pygments(code, _context)
-        Bridgetown.logger.warn "Warning:", "Highlight Tag no longer supports" \
-                                " rendering with Pygments."
-        Bridgetown.logger.warn "", "Using the default highlighter, Rouge, instead."
-        render_rouge(code)
-      end
-
       def render_rouge(code)
         require "rouge"
         formatter = ::Rouge::Formatters::HTMLLegacy.new(
@@ -92,17 +83,13 @@ module Bridgetown
         formatter.format(lexer.lex(code))
       end
 
-      def render_codehighlighter(code)
-        h(code).strip
-      end
-
       def add_code_tag(code)
         code_attributes = [
           "class=\"language-#{@lang.to_s.tr("+", "-")}\"",
           "data-lang=\"#{@lang}\"",
         ].join(" ")
-        "<figure class=\"highlight\"><pre><code #{code_attributes}>"\
-        "#{code.chomp}</code></pre></figure>"
+        "<figure class=\"highlight\"><pre><code #{code_attributes}>" \
+          "#{code.chomp}</code></pre></figure>"
       end
     end
   end

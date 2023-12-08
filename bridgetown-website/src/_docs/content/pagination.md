@@ -1,11 +1,11 @@
 ---
 title: Pagination
-hide_in_toc: true
 order: 0
-category: posts
+top_section: Writing Content
+category: resources
 ---
 
-{% render "docs/help_needed", page: page %}
+{%@ "docs/help_needed", resource: resource %}
 
 Pagination support is built-in to Bridgetown, but it is not enabled by default. To enable it on your site, simply add:
 
@@ -18,40 +18,49 @@ to your config file.
 
 ## Page Configuration
 
-To facilitate pagination on a page (like `index.html`, `blog.md`, etc.) then simply include configuration in the page's front matter:
+To facilitate pagination on any given page (like `index.html`, `blog.md`, etc.) then simply include configuration in the resource's front matter to specify which collection you'd like to paginate through:
 
 ``` yml
 ---
 layout: page
-pagination:
-  enabled: true
+paginate:
+  collection: posts
 ---
 ```
 
-Then you can use the `paginator.documents` logic to iterate through the documents.
+Then you can use the `paginator.resources` logic to iterate through the collection's resources.
 
 {% raw %}
 ``` html
-{% for post in paginator.documents %}
-  <h1>{{ post.title }}</h1>
+{% for post in paginator.resources %}
+  <h1>{{ post.data.title }}</h1>
 {% endfor %}
 ```
 {% endraw %}
 
-Normally the paginated documents are of a [Post](/docs/posts/) type, but to load a specific [Collection](/docs/collections/) type, just add a collection key like so:
+By default, paginated pages will have 10 items per page. You can change this in your config by modifying the `per_page` key like so:
 
 ```yml
-pagination:
-  enabled: true
-  collection: tigers
+paginate:
+  collection: posts
+  per_page: 4
 ```
 
-By default, paginated documents will have 10 items per page. You can change this in your config by modifying the `per_page` key like so:
+You can also control the sort field and order of the paginated result set separately from the default sort of the collection:
 
 ```yml
-pagination:
-  enabled: true
-  per_page: 4
+paginate:
+  collection: movies
+  sort_field: rating
+  sort_reverse: true
+```
+
+## Excluding a Resource from the Paginator
+
+You can exclude a resource from being included in the paginated items list.
+
+```yml
+exclude_from_pagination: true
 ```
 
 ## Pagination Links
@@ -81,4 +90,4 @@ To display pagination links, simply use the `paginator` Liquid object as follows
 
 The `paginator` Liquid object provides the following attributes:
 
-{% render "docs/variables_table", scope: site.data.bridgetown_variables.paginator %}
+{%@ Documentation::VariablesTable data: site.data, scope: :paginator, description_size: :bigger %}

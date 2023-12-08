@@ -3,43 +3,41 @@
 module Bridgetown
   # Superclass for a website's SiteBuilder abstract class
   class Builder < Bridgetown::Builders::PluginBuilder
+    extend ActiveSupport::DescendantsTracker
+    include ActiveSupport::Callbacks
+
+    define_callbacks :build
+
     class << self
       def register
-        Bridgetown::Hooks.register_one :site, :pre_read, reloadable: false do |site|
-          new(name, site)
-        end
+        Bridgetown::Builders::PluginBuilder.plugin_registrations << self
+      end
+
+      def before_build(*args, **kwargs, &block)
+        set_callback :build, :before, *args, **kwargs, &block
+      end
+
+      def after_build(*args, **kwargs, &block)
+        set_callback :build, :after, *args, **kwargs, &block
+      end
+
+      def around_build(*args, **kwargs, &block)
+        set_callback :build, :around, *args, **kwargs, &block
       end
     end
 
-    # Subclass is expected to implement #build
-    def initialize(name, current_site = nil)
-      super(name, current_site)
-      build
+    def build_with_callbacks
+      run_callbacks(:build) { build }
+      self
     end
 
     def inspect
-      name
-    end
-
-    def self.inherited(const)
-      (@children ||= Set.new).add const
-      catch_inheritance(const) do |const_|
-        catch_inheritance(const_)
-      end
-    end
-
-    def self.catch_inheritance(const)
-      const.define_singleton_method :inherited do |const_|
-        (@children ||= Set.new).add const_
-        yield const_ if block_given?
-      end
+      "#<#{name}>"
     end
 
     def self.descendants
-      @children ||= Set.new
-      out = @children.map(&:descendants)
-      out << self unless ["SiteBuilder", "Bridgetown::Builder"].include?(name)
-      Set.new(out).flatten
+      site_builder_name = "SiteBuilder"
+      super.reject { |klass| [site_builder_name].include?(klass.name) }
     end
   end
 end

@@ -1,25 +1,20 @@
 url: "https://www.bridgetownrb.com"
 permalink: simple
 timezone: America/Los_Angeles
-
-# components_dir:
-#   - ../shared/components
-#   - _components
+template_engine: serbea
 
 collections:
   docs:
     output: true
-    permalink: /:collection/:path
+    permalink: "/:collection/:path.*"
     sort_by: order
     name: Documentation
-    foo: bar
 
 pagination:
   enabled: true
 
+html_inspector_parser: nokolexbor
+
 # Environment-specific settings
 development:
   unpublished: true
-
-svg:
-  optimize: true

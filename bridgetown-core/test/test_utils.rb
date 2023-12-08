@@ -3,7 +3,7 @@
 require "helper"
 
 class TestUtils < BridgetownUnitTest
-  context "The \`Utils.deep_merge_hashes\` method" do
+  context "The `Utils.deep_merge_hashes` method" do
     setup do
       clear_dest
       @site = fixture_site
@@ -45,14 +45,14 @@ class TestUtils < BridgetownUnitTest
         assert_equal %w(dog cat), Utils.pluralized_array_from_hash(data, "tag", "tags")
       end
 
-      should "return single value array with matching singular" do
+      should "return plural array with merged singular" do
         data = { "foo" => "bar", "tag" => "dog", "tags" => %w(dog cat) }
-        assert_equal ["dog"], Utils.pluralized_array_from_hash(data, "tag", "tags")
+        assert_equal %w[dog cat], Utils.pluralized_array_from_hash(data, "tag", "tags")
       end
 
-      should "return single value array with matching singular with spaces" do
+      should "return array with singular added to pluaral with spaces" do
         data = { "foo" => "bar", "tag" => "dog cat", "tags" => %w(dog cat) }
-        assert_equal ["dog cat"], Utils.pluralized_array_from_hash(data, "tag", "tags")
+        assert_equal ["dog cat", "dog", "cat"], Utils.pluralized_array_from_hash(data, "tag", "tags")
       end
 
       should "return empty array with matching nil plural" do
@@ -89,7 +89,7 @@ class TestUtils < BridgetownUnitTest
     end
   end
 
-  context "The \`Utils.parse_date\` method" do
+  context "The `Utils.parse_date` method" do
     should "parse a properly formatted date" do
       assert Utils.parse_date("2014-08-02 14:43:06 PDT").is_a? Time
     end
@@ -128,7 +128,7 @@ class TestUtils < BridgetownUnitTest
     end
   end
 
-  context "The \`Utils.slugify\` method" do
+  context "The `Utils.slugify` method" do
     should "return nil if passed nil" do
       assert Utils.slugify(nil).nil?
     rescue NoMethodError
@@ -286,13 +286,12 @@ class TestUtils < BridgetownUnitTest
       )
     end
 
-    should "records a warning in the log if the returned slug is empty" do
-      expect(Bridgetown.logger).to receive(:warn)
+    should "not include emoji characters" do
       assert_equal "", Utils.slugify("💎")
     end
   end
 
-  context "The \`Utils.titleize_slug\` method" do
+  context "The `Utils.titleize_slug` method" do
     should "capitalize all words and not drop any words" do
       assert_equal(
         "This Is A Long Title With Mixed Capitalization",
@@ -309,7 +308,7 @@ class TestUtils < BridgetownUnitTest
     end
   end
 
-  context "The \`Utils.add_permalink_suffix\` method" do
+  context "The `Utils.add_permalink_suffix` method" do
     should "handle built-in permalink styles" do
       assert_equal(
         "/:basename/",
@@ -349,23 +348,23 @@ class TestUtils < BridgetownUnitTest
     end
   end
 
-  context "The \`Utils.safe_glob\` method" do
+  context "The `Utils.safe_glob` method" do
     should "not apply pattern to the dir" do
       dir = "test/safe_glob_test["
-      assert_equal [], Dir.glob(dir + "/*")
+      assert_equal [], Dir.glob("#{dir}/*")
       assert_equal ["test/safe_glob_test[/find_me.txt"], Utils.safe_glob(dir, "*")
     end
 
     should "return the same data to #glob" do
       dir = "test"
-      assert_equal Dir.glob(dir + "/*"), Utils.safe_glob(dir, "*")
-      assert_equal Dir.glob(dir + "/**/*"), Utils.safe_glob(dir, "**/*")
+      assert_equal Dir.glob("#{dir}/*"), Utils.safe_glob(dir, "*")
+      assert_equal Dir.glob("#{dir}/**/*"), Utils.safe_glob(dir, "**/*")
     end
 
     should "return the same data to #glob if dir is not found" do
       dir = "dir_not_exist"
       assert_equal [], Utils.safe_glob(dir, "*")
-      assert_equal Dir.glob(dir + "/*"), Utils.safe_glob(dir, "*")
+      assert_equal Dir.glob("#{dir}/*"), Utils.safe_glob(dir, "*")
     end
 
     should "return the same data to #glob if pattern is blank" do
@@ -377,17 +376,17 @@ class TestUtils < BridgetownUnitTest
 
     should "return the same data to #glob if flag is given" do
       dir = "test"
-      assert_equal Dir.glob(dir + "/*", File::FNM_DOTMATCH),
+      assert_equal Dir.glob("#{dir}/*", File::FNM_DOTMATCH),
                    Utils.safe_glob(dir, "*", File::FNM_DOTMATCH)
     end
 
     should "support pattern as an array to support windows" do
       dir = "test"
-      assert_equal Dir.glob(dir + "/**/*"), Utils.safe_glob(dir, ["**", "*"])
+      assert_equal Dir.glob("#{dir}/**/*"), Utils.safe_glob(dir, ["**", "*"])
     end
   end
 
-  context "The \`Utils.has_yaml_header?\` method" do
+  context "The `Utils.has_yaml_header?` method" do
     should "accept files with YAML front matter" do
       file = source_dir("_posts", "2008-10-18-foo-bar.markdown")
       assert_equal "---\n", File.open(file, "rb") { |f| f.read(4) }
@@ -405,7 +404,7 @@ class TestUtils < BridgetownUnitTest
     end
   end
 
-  context "The \`Utils.merged_file_read_opts\` method" do
+  context "The `Utils.merged_file_read_opts` method" do
     should "ignore encoding if it's not there" do
       opts = Utils.merged_file_read_opts(nil, {})
       assert_nil opts["encoding"]
@@ -427,19 +426,19 @@ class TestUtils < BridgetownUnitTest
     end
   end
 
-  context "The \`Utils.default_github_branch_name\` method" do
+  context "The `Utils.default_github_branch_name` method" do
     should "return the correct default branch name" do
-      assert_equal "main", Utils.default_github_branch_name("https://github.com/whitefusionhq/phaedra/abc/12344")
+      allow(Faraday).to receive(:get).and_return double(
+        body: JSON.generate({ "default_branch" => "my_default_branch" })
+      )
+
+      assert_equal "my_default_branch", Utils.default_github_branch_name("https://github.com/whitefusionhq/phaedra/abc/12344")
     end
 
-    should "return master if all else fails" do
-      assert_equal "master", Utils.default_github_branch_name("https://github.com/thisorgdoesntexist/thisrepoistotallybogus")
-    end
-  end
+    should "return main if all else fails" do
+      allow(Faraday).to receive(:get).and_raise("nope")
 
-  context "Utils::Internet.connected?" do
-    should "return true if there's internet" do
-      assert Utils::Internet.connected?
+      assert_equal "main", Utils.default_github_branch_name("https://github.com/thisorgdoesntexist/thisrepoistotallybogus")
     end
   end
 end

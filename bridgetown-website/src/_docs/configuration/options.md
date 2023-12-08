@@ -1,8 +1,9 @@
 ---
 title: Configuration Options
-hide_in_toc: true
 order: 0
-category: configuration
+top_section: Configuration
+category: customize-your-site
+back_to: configuration
 ---
 
 The tables below list the available settings for Bridgetown, and the various <code
@@ -50,7 +51,26 @@ class="flag">flags</code> (specified on the command-line) that control them.
         <p class="default">Default: <code class="default">liquid</code></p>
       </td>
       <td class="has-text-centered">
-        <p><code class="option">template_engine: ENGINE (erb, slim, haml, etc.)</code></p>
+        <p><code class="option">template_engine: ENGINE (erb, serbea, slim, haml, etc.)</code></p>
+      </td>
+    </tr>
+    <tr class="setting">
+      <td>
+        <p class="name"><strong>Permalink</strong></p>
+        <p class="description">Change the default permalink style or template used by pages & blog posts. <a href="/docs/content/permalinks">Documentation here</a> and <a href="/docs/resources#configuring-permalinks">read this additional information</a>.</p>
+      </td>
+      <td class="has-text-centered">
+        <p><code class="option">permalink: STYLE or TEMPLATE</code></p>
+      </td>
+    </tr>
+    <tr class="setting">
+      <td>
+        <p class="name"><strong>Slugify Mode</strong></p>
+        <p class="description">Determine the method of transforming characters when slugs are generated. <a href="/docs/liquid/filters#options-for-the-slugify-filter" data-no-swup="true">Info on available options here</a>.</p>
+        <p class="default">Default: <code class="default">pretty</code></p>
+      </td>
+      <td class="has-text-centered">
+        <p><code class="option">slugify_mode: MODE</code></p>
       </td>
     </tr>
     <tr class="setting">
@@ -112,6 +132,15 @@ class="flag">flags</code> (specified on the command-line) that control them.
     </tr>
     <tr class="setting">
       <td>
+        <p class="name"><strong>Additional Watch Paths</strong></p>
+        <p class="description">Supply additional directories not normally covered by Bridgetown or Zeitwerk's autoloader to the file watcher to trigger a rebuild/reload. The paths are relative to the site root (but you can also provide absolute paths).</p>
+      </td>
+      <td class="has-text-centered">
+        <p><code class="option">additional_watch_paths: [DIR, DIR, ...]</code></p>
+      </td>
+    </tr>
+    <tr class="setting">
+      <td>
         <p class="name"><strong>Time Zone</strong></p>
         <p class="description">
             Set the time zone for site generation. This sets the <code>TZ</code>
@@ -131,11 +160,7 @@ class="flag">flags</code> (specified on the command-line) that control them.
       <td>
         <p class="name"><strong>Encoding</strong></p>
         <p class="description">
-            Set the encoding of files by name (only available for Ruby
-            1.9 or later).
-            The default value is <code>utf-8</code> starting in 2.0.0,
-            and <code>nil</code> before 2.0.0, which will yield the Ruby
-            default of <code>ASCII-8BIT</code>.
+            Set the encoding of files by name. The default value is <code>utf-8</code>.
             Available encodings can be shown by the
             command <code>ruby -e 'puts Encoding::list.join("\n")'</code>.
         </p>
@@ -153,22 +178,24 @@ class="flag">flags</code> (specified on the command-line) that control them.
         </p>
       </td>
       <td class='has-text-centered'>
-        <p><a href="{{ '/docs/configuration/front-matter-defaults/' | relative_url }}" title="details">More Information Here</a></p>
+        <p><a href="{{ '/docs/content/front-matter-defaults/' | relative_url }}" title="details">More Information Here</a></p>
       </td>
     </tr>
   </tbody>
 </table>
 
-{% rendercontent "docs/note", title: "Destination folders are cleaned upon site builds", type: "warning" %}
-The contents of `destination` are automatically cleaned when the site is built.
-Files or folders that are not created by your site will be removed. If you need to
-retain certain files/folders, specify them within the `keep_files` configuration
-directive. (For instance, Bridgetown automatically keeps compiled frontend assets
-from Webpack.)
+{%@ Note type: :warning do %}
+  #### Destination folders are cleaned upon site builds
 
-Do not use an important location for `destination` instead, use it as
-a staging area and copy files from there to your web server.
-{% endrendercontent %}
+  The contents of `destination` are automatically cleaned when the site is built.
+  Files or folders that are not created by your site will be removed. If you need to
+  retain certain files/folders, specify them within the `keep_files` configuration
+  directive. (For instance, Bridgetown automatically keeps compiled frontend assets
+  from esbuild/Webpack.)
+
+  Do not use an important location for `destination` instead, use it as
+  a staging area and copy files from there to your web server.
+{% end %}
 
 ### Build Command Options
 
@@ -224,37 +251,16 @@ a staging area and copy files from there to your web server.
       </td>
       <td class="has-text-centered">
         <p><code class="option">unpublished: BOOL</code></p>
-        <p><code class="flag">--unpublished</code></p>
+        <p><code class="flag">-U, --unpublished</code></p>
       </td>
     </tr>
     <tr class="setting">
       <td>
         <p class="name"><strong>Ruby Front Matter</strong></p>
-        <p class="description">Process <a href="/docs/front-matter/#ruby-front-matter" data-no-swup="true">Ruby front matter</a> (default true)</p>
+        <p class="description">Process <a href="/docs/front-matter/#the-power-of-ruby-in-front-matter" data-no-swup="true">Ruby front matter</a> (default true)</p>
       </td>
       <td class="has-text-centered">
         <p><code class="option">ruby_in_front_matter: BOOL</code></p>
-      </td>
-    </tr>
-    <tr class="setting">
-      <td>
-        <p class="name"><strong>LSI</strong></p>
-        <p class="description">Produce an index for related posts. Requires the
-          <a href="http://www.classifier-reborn.com/" rel="noopener">classifier-reborn</a> plugin.</p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="option">lsi: BOOL</code></p>
-        <p><code class="flag">--lsi</code></p>
-      </td>
-    </tr>
-    <tr class="setting">
-      <td>
-        <p class="name"><strong>Limit Posts</strong></p>
-        <p class="description">Limit the number of posts to parse and publish.</p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="option">limit_posts: NUM</code></p>
-        <p><code class="flag">--limit_posts NUM</code></p>
       </td>
     </tr>
     <tr class="setting">
@@ -288,21 +294,6 @@ a staging area and copy files from there to your web server.
     </tr>
     <tr class="setting">
       <td>
-        <p class="name"><strong>Incremental build</strong></p>
-        <p class="description">
-            Enable the experimental incremental build feature. Incremental build only
-            re-builds posts and pages that have changed, resulting in significant performance
-            improvements for large sites, but may also break site generation in certain
-            cases.
-        </p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="option">incremental: BOOL</code></p>
-        <p><code class="flag">-I, --incremental</code></p>
-      </td>
-    </tr>
-    <tr class="setting">
-      <td>
         <p class="name"><strong>Liquid profiler</strong></p>
         <p class="description">
             Generate a Liquid rendering profile to help you identify performance bottlenecks.
@@ -327,105 +318,23 @@ a staging area and copy files from there to your web server.
     </tr>
     <tr class="setting">
       <td>
-        <p class="name"><strong>Base URL</strong></p>
-        <p class="description">Serve the website from the given base URL.</p>
+        <p class="name"><strong>Base Path</strong></p>
+        <p class="description">Serve the website from the given base path.</p>
       </td>
       <td class="has-text-centered">
-        <p><code class="option">baseurl: URL</code></p>
-        <p><code class="flag">--baseurl URL</code></p>
+        <p><code class="option">base_path: URL</code></p>
+        <p><code class="flag">--base_path URL</code></p>
       </td>
     </tr>
   </tbody>
 </table>
 
-### Serve Command Options
+{%@ Note type: :warning do %}
+  #### Do not use tabs in configuration files
 
-In addition to the options below, the `serve` sub-command can accept any of the options
-for the `build` sub-command, which are then applied to the site build which occurs right
-before your site is served.
-
-<table class="settings">
-  <thead>
-    <tr>
-      <th>Setting</th>
-      <th class="has-text-centered"><ui-label class="option">Options</ui-label> and <ui-label class="flag">Flags</ui-label></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr class="setting">
-      <td>
-        <p class="name"><strong>Local Server Port</strong></p>
-        <p class="description">Listen on the given port.</p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="option">port: PORT</code></p>
-        <p><code class="flag">--port PORT</code></p>
-      </td>
-    </tr>
-    <tr class="setting">
-      <td>
-        <p class="name"><strong>Local Server Hostname</strong></p>
-        <p class="description">Listen at the given hostname.</p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="option">host: HOSTNAME</code></p>
-        <p><code class="flag">--host HOSTNAME</code></p>
-      </td>
-    </tr>
-    <tr class="setting">
-      <td>
-        <p class="name"><strong>Live Reload</strong></p>
-        <p class="description">Reload a page automatically on the browser when its content is edited.</p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="option">livereload: true</code></p>
-        <p><code class="flag">-l, --livereload</code></p>
-      </td>
-    </tr>
-    <tr class="setting">
-      <td>
-        <p class="name"><strong>Detach</strong></p>
-        <p class="description">Detach the server from the terminal.</p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="option">detach: BOOL</code></p>
-        <p><code class="flag">-B, --detach</code></p>
-      </td>
-    </tr>
-    <tr class="setting">
-      <td>
-        <p class="name"><strong>Skips the initial site build</strong></p>
-        <p class="description">Skips the initial site build which occurs before the server is started.</p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="flag">--skip-initial-build</code></p>
-      </td>
-    </tr>
-    <tr class="setting">
-      <td>
-        <p class="name"><strong>X.509 (SSL) Private Key</strong></p>
-        <p class="description">SSL Private Key, stored or symlinked in the site source.</p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="flag">--ssl-key</code></p>
-      </td>
-    </tr>
-    <tr class="setting">
-      <td>
-        <p class="name"><strong>X.509 (SSL) Certificate</strong></p>
-        <p class="description">SSL Public certificate, stored or symlinked in the site source.</p>
-      </td>
-      <td class="has-text-centered">
-        <p><code class="flag">--ssl-cert</code></p>
-      </td>
-    </tr>
-  </tbody>
-</table>
-
-{% rendercontent "docs/note", title: "Do not use tabs in configuration files", type: "warning" %}
   This will either lead to parsing errors, or Bridgetown will revert to the
   default settings. Use spaces instead.
-{% endrendercontent %}
+{% end %}
 
 ### Additional Configuration File Settings
 
@@ -439,44 +348,32 @@ Note that if you change `plugins_dir`, the option is relative to the current wor
 plugins_dir         : plugins
 collections_dir     : .
 layouts_dir         : _layouts
-data_dir            : _data
-includes_dir        : _includes
-sass:
-  sass_dir: _sass
+components_dir      : _components
+islands_dir         : _islands
+partials_dir        : _partials
+cache_dir           : .bridgetown-cache
 collections:
   posts:
     output          : true
+additional_watch_paths: []
 
 # Handling Reading
-include             : [".htaccess", "_redirects", ".well-known"],
+include             : [".htaccess", "_redirects", ".well-known"]
 keep_files          : [".git", ".svn", "_bridgetown"]
 encoding            : "utf-8"
 markdown_ext        : "markdown,mkdown,mkdn,mkd,md"
 strict_front_matter : false
 
 # Filtering Content
-limit_posts         : 0
 future              : false
 unpublished         : false
 
 # Conversion
 markdown            : kramdown
 highlighter         : rouge
-lsi                 : false
-excerpt_separator   : "\n\n"
-incremental         : false
 
-# Serving
-detach              : false
-port                : 4000
-host                : 127.0.0.1
-baseurl             : "" # does not include hostname
-show_dir_listing    : false
-
-# Outputting
-permalink           : date
+# System
 timezone            : null # e.g. America/Los_Angeles
-
 quiet               : false
 verbose             : false
 defaults            : []
@@ -497,4 +394,6 @@ kramdown:
   guess_lang        : true
   footnote_nr       : 1
   show_warnings     : false
+  include_extraction_tags: false
+  mark_highlighting : true
 ```

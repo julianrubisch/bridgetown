@@ -7,11 +7,13 @@ category: news
 
 Personally, [I'm a Bulma man myself](https://bulma.io), but I understand there are a ton of you out there who love [Tailwind CSS](https://tailwindcss.com) and won't give it up until they pry it out of your cold, dead hands.
 
-So I'm pleased as Ruby-colored punch to [highlight this breezy tutorial by Andrew Mason](https://andrewm.codes/posts/build-and-deploy-a-static-site-with-ruby-bridgetown-tailwindcss-and-netlify-3934/) all about how you can quickly and easily set up a new Bridgetown website with Tailwind CSS and PostCSS.
+So I'm pleased as Ruby-colored punch to [highlight this breezy tutorial by Andrew Mason][andrewm-blog] all about how you can quickly and easily set up a new Bridgetown website with Tailwind CSS and PostCSS.
 
-From the [article](https://andrewm.codes/posts/build-and-deploy-a-static-site-with-ruby-bridgetown-tailwindcss-and-netlify-3934/):
-
+From the [article][andrewm-blog]:
+									 
 > If you have had Ruby/Rails/Jekyll experience, you should feel right at home with Bridgetown. Bridgetown also removes the barrier to entry for integrating webpack and all the goodies the JavaScript community has to offer.
+
+[andrewm-blog]: https://andrewm.codes/blog/build-and-deploy-a-static-site-with-ruby-bridgetown-tailwindcss-and-netlify/
 
 ### Plugins Are Coming 😲
 
@@ -30,10 +32,11 @@ plugins: !ruby/string:Rb |
   conn = Faraday.new(
     url: endpoint,
     headers: {"Accept" => "application/vnd.github.v3+json"}
-  )
-  if ENV["BRIDGETOWN_GITHUB_TOKEN"]
-    username, token = ENV["BRIDGETOWN_GITHUB_TOKEN"].split(":")
-    conn.basic_auth(username, token)
+  ) do |faraday|
+    if ENV["BRIDGETOWN_GITHUB_TOKEN"]
+      username, token = ENV["BRIDGETOWN_GITHUB_TOKEN"].split(":")
+      faraday.request(:basic_auth, username, token)
+    end
   end
   items = JSON.parse(conn.get.body)["items"]
 
@@ -51,7 +54,6 @@ plugins: !ruby/string:Rb |
 
 And then down in the page we can use simple Liquid template syntax to loop through the plugins and output all relevant information. A simplified example:
 
-<!-- linthtml-configure tag-bans="false" -->
 {% raw %}
 ```liquid
 {% for plugin in page.plugins %}
@@ -72,6 +74,5 @@ And then down in the page we can use simple Liquid template syntax to loop throu
 {% endfor %}
 ```
 {% endraw %}
-<!-- linthtml-configure tag-bans="true" -->
 
 So take a peek at the [new Plugins directory](/plugins/) and think of what you'd like to see there in the future and then [let us know!](https://github.com/bridgetownrb/bridgetown/issues/new?assignees=&labels=feature&template=feature_request.md&title=feat%3A+)

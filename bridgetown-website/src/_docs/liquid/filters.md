@@ -1,8 +1,9 @@
 ---
 title: Liquid Filters
-hide_in_toc: true
+top_section: Designing Your Site
 order: 0
-category: liquid
+category: template-engines
+bridgetown_filters: site.data.bridgetown_variables.liquid_filters
 shopify_filter_url: https://shopify.github.io/liquid/filters/
 shopify_filters:
 - abs
@@ -58,7 +59,7 @@ All of the standard Liquid [filters](#standard-liquid-filters) are supported (se
 
 To make common tasks easier, Bridgetown even adds a few handy filters of its own,
 all of which you can find on this page. You can also create your own filters
-using [plugins](/docs/plugins/filters/).
+using [plugins](/docs/plugins/filters).
 
 <table class="settings bigger-output">
   <thead>
@@ -68,29 +69,29 @@ using [plugins](/docs/plugins/filters/).
     </tr>
   </thead>
   <tbody>
-    {% for filter in site.data.bridgetown_filters %}
+    {% data.bridgetown_filters.each do |filter| %}
       <tr>
         <td>
           <p class="name"><strong>{{ filter.name }}</strong></p>
           <p>
-            {{- filter.description -}}
+            {{ filter.description | safe }}
           </p>
         </td>
         <td class="align-center">
-          {%- for example in filter.examples %}
+          {% filter.examples.each do |example| %}
             <p><code class="filter">{{ example.input }}</code></p>
-            {% if example.output %}<p><code class="output">{{ example.output }}</code></p>{% endif %}
-          {% endfor -%}
+            {% if example.output %}<p><code class="output">{{ example.output }}</code></p>{% end %}
+          {% end %}
         </td>
       </tr>
-    {% endfor %}
+    {% end %}
   </tbody>
 </table>
 
 ### Options for the `slugify` filter
 
 The `slugify` filter accepts an option, each specifying what to filter.
-The default is `default`. They are as follows (with what they filter):
+The default is `pretty` (unless the `slugify_mode` setting is changed in the site config). They are as follows (with what they filter):
 
 - `none`: no characters
 - `raw`: spaces
@@ -107,7 +108,7 @@ You can use the `where` filter to detect documents and pages with properties tha
 ```liquid
 // Using `nil` to select posts that either do not have `my_prop`
 // defined or `my_prop` has been set to `nil` explicitly.
-{% assign filtered_posts = site.posts | where: 'my_prop', nil %}
+{% assign filtered_posts = collections.posts.resources | where: 'my_prop', nil %}
 ```
 {% endraw %}
 
@@ -115,7 +116,7 @@ You can use the `where` filter to detect documents and pages with properties tha
 ```liquid
 // Using Liquid's special literal `empty` or `blank` to select
 // posts that have `my_prop` set to an empty value.
-{% assign filtered_posts = site.posts | where: 'my_prop', empty %}
+{% assign filtered_posts = collections.posts.resources | where: 'my_prop', empty %}
 ```
 {% endraw %}
 
@@ -128,7 +129,7 @@ For example, to get a list of documents on English horror flicks, one could use 
 
 {% raw %}
 ```liquid
-{{ site.movies | where_exp: "item", "item.genre == 'horror' and item.language == 'English'" }}
+{{ collections.movies.resources | where_exp: "item", "item.genre == 'horror' and item.language == 'English'" }}
 ```
 {% endraw %}
 
@@ -136,14 +137,14 @@ Or to get a list of comic-book based movies, one may use the following:
 
 {% raw %}
 ```liquid
-{{ site.movies | where_exp: "item", "item.sub_genre == 'MCU' or item.sub_genre == 'DCEU'" }}
+{{ collections.movies.resources | where_exp: "item", "item.sub_genre == 'MCU' or item.sub_genre == 'DCEU'" }}
 ```
 {% endraw %}
 
 ### Standard Liquid Filters
 
-For your convenience, here is the list of all [Liquid filters]({{ page.shopify_filter_url }}) with links to examples in the official Liquid documentation.
+For your convenience, here is the list of all [Liquid filters]({{ data.shopify_filter_url }}) with links to examples in the official Liquid documentation.
 
-{% for filter in page.shopify_filters %}
-- [{{ filter }}]({{ filter | prepend: page.shopify_filter_url | append: '/' }})
-{% endfor %}
+{% data.shopify_filters.each do |filter| %}
+- [{{ filter }}]({{ filter | prepend: data.shopify_filter_url | append: '/' }})
+{% end %}

@@ -4,12 +4,18 @@ require "helper"
 require "colorator"
 
 class TestConfiguration < BridgetownUnitTest
-  test_config = {
-    "root_dir"    => site_root_dir,
-    "plugins_dir" => site_root_dir("plugins"),
-    "source"      => source_dir,
-    "destination" => dest_dir,
-  }
+  def test_config
+    @test_config ||= {
+      "root_dir"    => site_root_dir,
+      "plugins_dir" => site_root_dir("plugins"),
+      "source"      => source_dir,
+      "destination" => dest_dir,
+    }
+  end
+
+  def default_config_fixture(overrides = {})
+    Bridgetown.configuration(test_config.merge(overrides))
+  end
 
   context ".from" do
     should "create a Configuration object" do
@@ -19,7 +25,7 @@ class TestConfiguration < BridgetownUnitTest
     should "merge input over defaults" do
       result = Configuration.from("source" => "blah")
       refute_equal result["source"], Configuration::DEFAULTS["source"]
-      assert_equal "blah", result["source"]
+      assert_equal File.expand_path("blah"), result["source"]
     end
 
     should "return a valid Configuration instance" do
@@ -28,10 +34,20 @@ class TestConfiguration < BridgetownUnitTest
 
     should "add default collections" do
       result = Configuration.from({})
-      expected = { "posts" => {
-        "output"    => true,
-        "permalink" => "/:categories/:year/:month/:day/:title:output_ext",
-      } }
+      expected = {
+        "posts" => {
+          "output"         => true,
+          "sort_direction" => "descending",
+          "permalink"      => "pretty",
+        },
+        "pages" => {
+          "output"    => true,
+          "permalink" => "/:locale/:path/",
+        },
+        "data"  => {
+          "output" => false,
+        },
+      }
       assert_equal expected, result["collections"]
     end
 
@@ -92,27 +108,7 @@ class TestConfiguration < BridgetownUnitTest
     should "turn an array into a hash" do
       result = Configuration[{ "collections" => %w(methods) }].add_default_collections
       assert_instance_of HashWithDotAccess::Hash, result["collections"]
-      expected = { "posts" => { "output" => true }, "methods" => {} }
-      assert_equal expected, result["collections"]
-    end
-
-    should "only assign collections.posts.permalink if a permalink is specified" do
-      result = Configuration[{ "permalink" => "pretty", "collections" => {} }]
-        .add_default_collections
-
-      expected = {
-        "posts" => {
-          "output"    => true,
-          "permalink" => "/:categories/:year/:month/:day/:title/",
-        },
-      }
-
-      assert_equal expected, result["collections"]
-
-      result   = Configuration[{ "permalink" => nil, "collections" => {} }].add_default_collections
-      expected = { "posts" => { "output" => true } }
-
-      assert_equal expected, result["collections"]
+      assert_equal({}, result.collections["methods"])
     end
 
     should "forces posts to output" do
@@ -233,7 +229,7 @@ class TestConfiguration < BridgetownUnitTest
     end
 
     should "not raise an error on empty files" do
-      allow(SafeYAML).to receive(:load_file).with(File.expand_path("empty.yml")).and_return(false)
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(File.expand_path("empty.yml")).and_return(false)
       Bridgetown.logger.log_level = :warn
       @config.read_config_file("empty.yml")
       Bridgetown.logger.log_level = :info
@@ -246,8 +242,8 @@ class TestConfiguration < BridgetownUnitTest
     end
 
     should "continue to read config files if one is empty" do
-      allow(SafeYAML).to receive(:load_file).with(File.expand_path("empty.yml")).and_return(false)
-      allow(SafeYAML).to receive(:load_file).with(File.expand_path("not_empty.yml")).and_return(
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(File.expand_path("empty.yml")).and_return(false)
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(File.expand_path("not_empty.yml")).and_return(
         "foo" => "bar"
       )
       Bridgetown.logger.log_level = :warn
@@ -288,23 +284,23 @@ class TestConfiguration < BridgetownUnitTest
     end
 
     should "fire warning with no bridgetown.config.yml" do
-      allow(SafeYAML).to receive(:load_file).with(@path) do
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(@path) do
         raise SystemCallError, "No such file or directory - #{@path}"
       end
       allow($stderr).to receive(:puts).with(
         Colorator.yellow("Configuration file: none")
       )
-      assert_equal site_configuration, Bridgetown.configuration(test_config)
+      assert_equal site_configuration, default_config_fixture
     end
 
     should "load configuration as hash" do
-      allow(SafeYAML).to receive(:load_file).with(@path).and_return({})
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(@path).and_return({})
       allow($stdout).to receive(:puts).with("Configuration file: #{@path}")
-      assert_equal site_configuration, Bridgetown.configuration(test_config)
+      assert_equal site_configuration, default_config_fixture
     end
 
     should "fire warning with bad config" do
-      allow(SafeYAML).to receive(:load_file).with(@path).and_return([])
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(@path).and_return([])
       allow($stderr)
         .to receive(:puts)
         .and_return(
@@ -314,11 +310,11 @@ class TestConfiguration < BridgetownUnitTest
       allow($stderr)
         .to receive(:puts)
         .and_return(Colorator.yellow("Configuration file: (INVALID) #{@path}"))
-      assert_equal site_configuration, Bridgetown.configuration(test_config)
+      assert_equal site_configuration, default_config_fixture
     end
 
     should "fire warning when user-specified config file isn't there" do
-      allow(SafeYAML).to receive(:load_file).with(@user_config) do
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(@user_config) do
         raise SystemCallError, "No such file or directory - #{@user_config}"
       end
       allow($stderr)
@@ -330,11 +326,6 @@ class TestConfiguration < BridgetownUnitTest
       assert_raises LoadError do
         Bridgetown.configuration("config" => [@user_config])
       end
-    end
-
-    should "not clobber YAML.load to the dismay of other libraries" do
-      assert_equal :foo, YAML.load(":foo")
-      # as opposed to: assert_equal ':foo', SafeYAML.load(':foo')
     end
   end
 
@@ -349,13 +340,13 @@ class TestConfiguration < BridgetownUnitTest
     end
 
     should "load default plus posts config if no config_file is set" do
-      allow(SafeYAML).to receive(:load_file).with(@paths[:default]).and_return({})
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(@paths[:default]).and_return({})
       allow($stdout).to receive(:puts).with("Configuration file: #{@paths[:default]}")
-      assert_equal site_configuration, Bridgetown.configuration(test_config)
+      assert_equal site_configuration, default_config_fixture
     end
 
     should "load different config if specified" do
-      allow(SafeYAML)
+      allow(Bridgetown::YAMLParser)
         .to receive(:load_file)
         .with(@paths[:other])
         .and_return("baseurl" => "http://example.com")
@@ -365,12 +356,12 @@ class TestConfiguration < BridgetownUnitTest
           "baseurl" => "http://example.com",
           "config"  => @paths[:other]
         ),
-        Bridgetown.configuration(test_config.merge("config" => @paths[:other]))
+        default_config_fixture({ "config" => @paths[:other] })
     end
 
     should "load different config if specified with symbol key" do
-      allow(SafeYAML).to receive(:load_file).with(@paths[:default]).and_return({})
-      allow(SafeYAML)
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(@paths[:default]).and_return({})
+      allow(Bridgetown::YAMLParser)
         .to receive(:load_file)
         .with(@paths[:other])
         .and_return("baseurl" => "http://example.com")
@@ -380,56 +371,36 @@ class TestConfiguration < BridgetownUnitTest
           "baseurl" => "http://example.com",
           "config"  => @paths[:other]
         ),
-        Bridgetown.configuration(test_config.merge(config: @paths[:other]))
+        default_config_fixture({ config: @paths[:other] })
     end
 
     should "load default config if path passed is empty" do
-      allow(SafeYAML).to receive(:load_file).with(@paths[:default]).and_return({})
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(@paths[:default]).and_return({})
       allow($stdout).to receive(:puts).with("Configuration file: #{@paths[:default]}")
       assert_equal \
         site_configuration("config" => [@paths[:empty]]),
-        Bridgetown.configuration(test_config.merge("config" => [@paths[:empty]]))
-    end
-
-    should "successfully load a TOML file" do
-      Bridgetown.logger.log_level = :warn
-      assert_equal \
-        site_configuration(
-          "baseurl" => "/you-beautiful-blog-you",
-          "title"   => "My magnificent site, wut",
-          "config"  => [@paths[:toml]]
-        ),
-        Bridgetown.configuration(test_config.merge("config" => [@paths[:toml]]))
-      Bridgetown.logger.log_level = :info
+        default_config_fixture({ "config" => [@paths[:empty]] })
     end
 
     should "load multiple config files" do
-      External.require_with_graceful_fail("tomlrb")
-
-      allow(SafeYAML).to receive(:load_file).with(@paths[:default]).and_return({})
-      allow(SafeYAML).to receive(:load_file).with(@paths[:other]).and_return({})
-      allow(Tomlrb).to receive(:load_file).with(@paths[:toml]).and_return({})
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(@paths[:default]).and_return({})
+      allow(Bridgetown::YAMLParser).to receive(:load_file).with(@paths[:other]).and_return({})
       allow($stdout).to receive(:puts).with("Configuration file: #{@paths[:default]}")
       allow($stdout).to receive(:puts).with("Configuration file: #{@paths[:other]}")
-      allow($stdout).to receive(:puts).with("Configuration file: #{@paths[:toml]}")
       assert_equal(
         site_configuration(
-          "config" => [@paths[:default], @paths[:other], @paths[:toml]]
+          "config" => [@paths[:default], @paths[:other]]
         ),
-        Bridgetown.configuration(
-          test_config.merge(
-            "config" => [@paths[:default], @paths[:other], @paths[:toml]]
-          )
-        )
+        default_config_fixture({ "config" => [@paths[:default], @paths[:other]] })
       )
     end
 
     should "load multiple config files and last config should win" do
-      allow(SafeYAML)
+      allow(Bridgetown::YAMLParser)
         .to receive(:load_file)
         .with(@paths[:default])
         .and_return("baseurl" => "http://example.dev")
-      allow(SafeYAML)
+      allow(Bridgetown::YAMLParser)
         .to receive(:load_file)
         .with(@paths[:other])
         .and_return("baseurl" => "http://example.com")
@@ -444,15 +415,13 @@ class TestConfiguration < BridgetownUnitTest
           "baseurl" => "http://example.com",
           "config"  => [@paths[:default], @paths[:other]]
         ),
-        Bridgetown.configuration(
-          test_config.merge("config" => [@paths[:default], @paths[:other]])
-        )
+        default_config_fixture({ "config" => [@paths[:default], @paths[:other]] })
     end
   end
 
   context "#merge_environment_specific_options!" do
     should "merge options in that are environment-specific" do
-      conf = Configuration[default_configuration]
+      conf = Configuration[Bridgetown::Configuration::DEFAULTS.deep_dup]
       refute conf["unpublished"]
       conf["test"] = { "unpublished" => true }
       conf.merge_environment_specific_options!
@@ -463,67 +432,35 @@ class TestConfiguration < BridgetownUnitTest
 
   context "#add_default_collections" do
     should "not do anything if collections is nil" do
-      conf = Configuration[default_configuration].tap { |c| c["collections"] = nil }
+      conf = Configuration[Bridgetown::Configuration::DEFAULTS.deep_dup].tap { |c| c["collections"] = nil }
       assert_equal conf.add_default_collections, conf
       assert_nil conf.add_default_collections["collections"]
     end
 
     should "converts collections to a hash if an array" do
-      conf = Configuration[default_configuration].tap do |c|
+      conf = Configuration[Bridgetown::Configuration::DEFAULTS.deep_dup].tap do |c|
         c["collections"] = ["docs"]
       end
-      assert_equal conf.add_default_collections, conf.merge(
-        "collections" => {
-          "docs"  => {},
-          "posts" => {
-            "output"    => true,
-            "permalink" => "/:categories/:year/:month/:day/:title:output_ext",
-          },
-        }
-      )
+      conf.add_default_collections
+      assert conf.collections.posts.is_a?(Hash)
+      assert conf.collections.docs.is_a?(Hash)
     end
 
     should "force collections.posts.output = true" do
-      conf = Configuration[default_configuration].tap do |c|
+      conf = Configuration[Bridgetown::Configuration::DEFAULTS.deep_dup].tap do |c|
         c["collections"] = { "posts" => { "output" => false } }
       end
-      assert_equal conf.add_default_collections, conf.merge(
-        "collections" => {
-          "posts" => {
-            "output"    => true,
-            "permalink" => "/:categories/:year/:month/:day/:title:output_ext",
-          },
-        }
-      )
-    end
-
-    should "set collections.posts.permalink if it's not set" do
-      conf = Configuration[default_configuration]
-      assert_equal conf.add_default_collections, conf.merge(
-        "collections" => {
-          "posts" => {
-            "output"    => true,
-            "permalink" => "/:categories/:year/:month/:day/:title:output_ext",
-          },
-        }
-      )
+      assert conf.add_default_collections.collections.posts.output
     end
 
     should "leave collections.posts.permalink alone if it is set" do
       posts_permalink = "/:year/:title/"
-      conf = Configuration[default_configuration].tap do |c|
+      conf = Configuration[Bridgetown::Configuration::DEFAULTS.deep_dup].tap do |c|
         c["collections"] = {
           "posts" => { "permalink" => posts_permalink },
         }
       end
-      assert_equal conf.add_default_collections, conf.merge(
-        "collections" => {
-          "posts" => {
-            "output"    => true,
-            "permalink" => posts_permalink,
-          },
-        }
-      )
+      assert_equal posts_permalink, conf.add_default_collections.collections.posts.permalink
     end
   end
 
@@ -558,6 +495,61 @@ class TestConfiguration < BridgetownUnitTest
       )
       assert_includes config["description"], "an awesome description"
       refute_includes config["description"], "\n"
+    end
+  end
+
+  context "initializers" do
+    setup do
+      @config = Configuration.from({})
+      @config.initializers = {}
+
+      @config.initializers[:something] =
+        Bridgetown::Configuration::Initializer.new(
+          name: :something,
+          block: proc { |secret_value:|
+            assert_equal secret_value, "shhh!"
+          },
+          completed: false
+        )
+    end
+
+    should "affect the underlying configuration" do
+      dsl = Configuration::ConfigurationDSL.new(scope: @config, data: @config)
+
+      dsl.instance_variable_set(:@context, :testing)
+      dsl.instance_exec(dsl) do |config|
+        url "http://www.proddomain.com"
+
+        only :testing do
+          url "http://www.testdomain.com"
+
+          init :something, require_gem: false do
+            secret_value "shhh!"
+          end
+        end
+
+        except :testing do
+          url "http://www.fakedomain.com"
+        end
+
+        config.autoload_paths << "stuff"
+      end
+
+      assert_equal "http://www.testdomain.com", @config.url
+      assert_equal "stuff", @config.autoload_paths.last
+
+      assert @config.init_params.key?("something")
+    end
+
+    should "set the global timezone" do
+      dsl = Configuration::ConfigurationDSL.new(scope: @config, data: @config)
+
+      dsl.instance_variable_set(:@context, :testing)
+      dsl.instance_exec(dsl) do
+        timezone "GMT"
+      end
+
+      assert_equal "GMT", Bridgetown.timezone
     end
   end
 end

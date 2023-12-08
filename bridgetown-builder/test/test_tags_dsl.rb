@@ -9,7 +9,7 @@ class TagsBuilder < Builder
       "output of the tag #{attr}"
     end
 
-    liquid_tag "upcase_tag", as_block: true do |_attributes, tag|
+    liquid_tag :upcase_tag, as_block: true do |_attributes, tag|
       tag.content.upcase
     end
 
@@ -22,9 +22,8 @@ end
 class TestTagsDSL < BridgetownUnitTest
   context "adding a Liquid tag" do
     setup do
-      Bridgetown.sites.clear
       @site = Site.new(site_configuration)
-      @builder = TagsBuilder.new("TagsDSL", @site)
+      @builder = TagsBuilder.new("TagsDSL", @site).build_with_callbacks
     end
 
     should "output the right tag" do
@@ -41,7 +40,8 @@ class TestTagsDSL < BridgetownUnitTest
 
     should "provide context access" do
       content = "This is the {% testing_context %}"
-      result = Liquid::Template.parse(content).render({ "yay" => "yay!" }, registers: { value: 123 })
+      result = Liquid::Template.parse(content).render({ "yay" => "yay!" },
+                                                      registers: { value: 123 })
       assert_equal "This is the context value 123, yay!", result
     end
   end

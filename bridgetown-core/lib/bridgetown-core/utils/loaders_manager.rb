@@ -20,9 +20,7 @@ module Bridgetown
       def unload_loaders
         return if @loaders.keys.empty?
 
-        @loaders.each do |_path, loader|
-          loader.unload
-        end
+        @loaders.each_value(&:unload)
         @loaders = {}
       end
 
@@ -41,9 +39,11 @@ module Bridgetown
         end
 
         # TODO: this could probably be refactored to work like the above
-        ActiveSupport::DescendantsTracker.class_variable_get(
-          :@@direct_descendants
-        )[value.superclass]&.reject! { _1 == value }
+        if ActiveSupport::DescendantsTracker.class_variables.include?(:@@direct_descendants)
+          ActiveSupport::DescendantsTracker.class_variable_get(
+            :@@direct_descendants
+          )[value.superclass]&.reject! { _1 == value }
+        end
       end
 
       def setup_loaders(autoload_paths = []) # rubocop:todo Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
@@ -64,7 +64,7 @@ module Bridgetown
           loader.enable_reloading if reloading_enabled?(load_path)
           loader.ignore(File.join(load_path, "**", "*.js.rb"))
           loader.ignore(
-            File.join(File.expand_path(config[:islands_dir], config[:source]), "routes")
+            File.join(File.expand_path(config[:islands_dir], config[:source]), "**", "routes")
           )
           config.autoloader_collapsed_paths.each do |collapsed_path|
             next unless collapsed_path.starts_with?(load_path)

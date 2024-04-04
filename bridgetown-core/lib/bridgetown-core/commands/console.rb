@@ -2,16 +2,10 @@
 
 module Bridgetown
   module ConsoleMethods
-    def site
-      Bridgetown::Current.site
-    end
-
-    def collections
-      site.collections
-    end
-
     def reload!
       Bridgetown.logger.info "Reloading site..."
+
+      site = Bridgetown::Current.site
 
       I18n.reload! # make sure any locale files get read again
       Bridgetown::Hooks.trigger :site, :pre_reload, site
@@ -66,9 +60,15 @@ module Bridgetown
                    type: :boolean,
                    desc: "Print verbose output."
 
-      def console
+      def console # rubocop:disable Metrics
         require "irb"
-        require "irb/ext/save-history"
+        new_history_behavior = false
+        begin
+          require "irb/ext/save-history"
+        rescue LoadError
+          # Code path for Ruby 3.3+
+          new_history_behavior = true
+        end
         require "amazing_print" unless options[:"bypass-ap"]
 
         Bridgetown.logger.adjust_verbosity(options)
@@ -93,9 +93,12 @@ module Bridgetown
         IRB::ExtendCommandBundle.include ConsoleMethods
         IRB.setup(nil)
         workspace = IRB::WorkSpace.new
+        workspace.main.define_singleton_method(:site) { Bridgetown::Current.site }
+        workspace.main.define_singleton_method(:collections) { site.collections }
         irb = IRB::Irb.new(workspace)
         IRB.conf[:IRB_RC]&.call(irb.context)
         IRB.conf[:MAIN_CONTEXT] = irb.context
+        irb.context.io.load_history if new_history_behavior
         Bridgetown.logger.info "Console:", "Your site is now available as #{"site".cyan}"
         Bridgetown.logger.info "",
                                "You can also access #{"collections".cyan} or perform a " \
@@ -117,6 +120,7 @@ module Bridgetown
           end
         ensure
           IRB.conf[:AT_EXIT].each(&:call)
+          irb.context.io.save_history if new_history_behavior
         end
       end
     end

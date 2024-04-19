@@ -2,6 +2,8 @@
 
 module Bridgetown
   class Collection
+    include Enumerable
+
     # @return [Bridgetown::Site]
     attr_reader :site
 
@@ -49,10 +51,8 @@ module Bridgetown
       resources.group_by(&:relative_url).transform_values(&:first)
     end
 
-    # Iterate over Resources
-    def each(&)
-      resources.each(&)
-    end
+    # Iterate over Resources, support Enumerable
+    def each(...) = resources.each(...)
 
     # Fetch the static files in this collection.
     # Defaults to an empty array if no static files have been read in.
@@ -60,11 +60,6 @@ module Bridgetown
     # @return [Array<Bridgetown::StaticFile>]
     def static_files
       @static_files ||= []
-    end
-
-    def files
-      Bridgetown::Deprecator.deprecation_message "Collection#files is now Collection#static_files"
-      static_files
     end
 
     # Read the allowed resources into the collection's array of resources.

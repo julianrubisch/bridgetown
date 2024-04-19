@@ -2,6 +2,7 @@
 
 module Bridgetown
   class Component
+    include Bridgetown::Streamlined
     extend Forwardable
 
     def_delegators :@view_context, :liquid_render, :partial
@@ -91,7 +92,7 @@ module Bridgetown
       end
 
       def path_for_errors
-        component_template_path
+        File.basename(component_template_path)
       rescue RuntimeError
         source_location
       end
@@ -159,7 +160,6 @@ module Bridgetown
     # @param item [Object] a component supporting `render_in` or a partial name
     # @param options [Hash] passed to the `partial` helper if needed
     # @return [String]
-    # rubocop:disable Naming/BlockForwarding
     def render(item, options = {}, &block)
       if item.respond_to?(:render_in)
         result = ""
@@ -171,7 +171,6 @@ module Bridgetown
         partial(item, options, &block)&.html_safe
       end
     end
-    # rubocop:enable Naming/BlockForwarding
 
     # This is where the magic happens. Render the component within a view context.
     #
@@ -181,6 +180,12 @@ module Bridgetown
       @_content_block = block
 
       if render?
+        if helpers.site.config.fast_refresh
+          signal = helpers.site.tmp_cache["comp-signal:#{self.class.source_location}"] ||=
+            Signalize.signal(1)
+          # subscribe so resources are attached to this component within effect
+          signal.value
+        end
         before_render
         template
       else
